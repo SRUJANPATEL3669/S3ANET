@@ -29,8 +29,9 @@ def main(args):
         save_pre_dir = './Data/IndianP/'
 
     X = np.load(save_pre_dir + 'X.npy')
-    _, h, w = X.shape
+    num_features, h, w = X.shape
     Y = np.load(save_pre_dir + 'Y.npy')
+    num_classes = int(Y.max())
 
     X_train = np.reshape(X, (1, num_features, h, w))
     train_array = np.load(save_pre_dir + 'train_array.npy')
@@ -123,7 +124,7 @@ def main(args):
         OA2, kappa2, ProducerA2 = CalAccuracy(predict_labels[test_array], Y[test_array])
         AA2 = np.mean(ProducerA2)
 
-        img = DrawResult(np.reshape(predict_labels + 1, -1), args.dataID)
+        img = DrawResult(np.reshape(predict_labels + 1, -1), args.dataID, h, w)
         plt.imsave(save_path_prefix + args.model + '_FGSM_OA' + repr(int(OA2 * 10000)) + '_kappa' + repr(
             int(kappa2 * 10000)) + 'Epsilon' + str(args.epsilon) + '.png', img)
         ######
@@ -147,7 +148,7 @@ if __name__ == '__main__':
     parser.add_argument('--beta', type=float, default=1)
     parser.add_argument('--epoch', type=int, default=1000)
     parser.add_argument('--iter', type=int, default=10)
-    parser.add_argument('--bins', nargs='+',type=int)
+    parser.add_argument('--bins', nargs='+',type=int, default=[1, 2, 3, 6])
 
     args = parser.parse_args()
     main(args)

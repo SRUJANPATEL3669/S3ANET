@@ -18,7 +18,7 @@ def featureNormalize(X,type):
         X_norm = X_norm/(maxX-minX)
         return X_norm    
         
-def DrawResult(labels,imageID):
+def DrawResult(labels,imageID,h=None,w=None):
     #ID=1:Pavia University
     num_class = int(labels.max())
     if imageID == 1:
@@ -116,6 +116,9 @@ def DrawResult(labels,imageID):
         X_result[np.where(labels==i),1] = palette[i-1,1]
         X_result[np.where(labels==i),2] = palette[i-1,2]
     
+    if h is not None and w is not None:
+        row = h
+        col = w
     X_result = np.reshape(X_result,(row,col,3))
     plt.axis ( "off" ) 
     plt.imshow(X_result)    
