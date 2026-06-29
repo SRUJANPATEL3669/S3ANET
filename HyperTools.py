@@ -160,10 +160,17 @@ def LoadHSI(dataID=1,num_label=150):
             data = sio.loadmat('./Data/GRSS2013_gt.mat')
             Y = data['GRSS2013_gt']
         else:
-            data = sio.loadmat('./Data/Houston13.mat')
-            X = data.get('Houston13', data.get('houston', data.get('GRSS2013')))
-            data = sio.loadmat('./Data/Houston13_7gt.mat')
-            Y = data.get('Houston13_7gt', data.get('houston_gt', data.get('GRSS2013_gt', data.get('Houston13_gt'))))
+            try:
+                data = sio.loadmat('./Data/Houston13.mat')
+                X = data.get('Houston13', data.get('houston', data.get('GRSS2013')))
+                data_gt = sio.loadmat('./Data/Houston13_7gt.mat')
+                Y = data_gt.get('Houston13_7gt', data_gt.get('houston_gt', data_gt.get('GRSS2013_gt', data_gt.get('Houston13_gt'))))
+            except NotImplementedError:
+                import h5py
+                with h5py.File('./Data/Houston13.mat', 'r') as f:
+                    X = np.array(f.get('Houston13') or f.get('houston') or f.get('GRSS2013')).T
+                with h5py.File('./Data/Houston13_7gt.mat', 'r') as f:
+                    Y = np.array(f.get('Houston13_7gt') or f.get('houston_gt') or f.get('GRSS2013_gt') or f.get('Houston13_gt')).T
     elif dataID==4:
         data = sio.loadmat('./Data/Indian_pines_corrected.mat')
         X = data['indian_pines_corrected']
@@ -190,8 +197,10 @@ def LoadHSI(dataID=1,num_label=150):
         n_data = index.shape[0]
         np.random.seed(12345)
         randomArray_label = np.random.permutation(n_data)
-        train_num = num_label
-        # train_num = num_label[i-1]
+        if isinstance(num_label, list):
+            train_num = num_label[i-1]
+        else:
+            train_num = num_label
         if i==1:
             train_array = index[randomArray_label[0:train_num]]
             test_array = index[randomArray_label[train_num:n_data]]
