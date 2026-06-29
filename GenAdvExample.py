@@ -31,7 +31,7 @@ def main(args):
     X = np.load(save_pre_dir+'X.npy')
     num_features,h,w = X.shape
     Y = np.load(save_pre_dir+'Y.npy')
-    num_classes = int(Y.max())
+    num_classes = int(Y.max()) + 1
     
     X_train = np.reshape(X,(1,num_features,h,w))
     train_array = np.load(save_pre_dir+'train_array.npy')
