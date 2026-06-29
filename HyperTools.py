@@ -168,9 +168,11 @@ def LoadHSI(dataID=1,num_label=150):
             except NotImplementedError:
                 import h5py
                 with h5py.File('./Data/Houston13.mat', 'r') as f:
-                    X = np.array(f.get('Houston13') or f.get('houston') or f.get('GRSS2013')).T
+                    valid_keys = [k for k in f.keys() if not k.startswith('#')]
+                    X = np.array(f[valid_keys[0]]).T
                 with h5py.File('./Data/Houston13_7gt.mat', 'r') as f:
-                    Y = np.array(f.get('Houston13_7gt') or f.get('houston_gt') or f.get('GRSS2013_gt') or f.get('Houston13_gt')).T
+                    valid_keys_gt = [k for k in f.keys() if not k.startswith('#')]
+                    Y = np.array(f[valid_keys_gt[0]]).T
     elif dataID==4:
         data = sio.loadmat('./Data/Indian_pines_corrected.mat')
         X = data['indian_pines_corrected']
