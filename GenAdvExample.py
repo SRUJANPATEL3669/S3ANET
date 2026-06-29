@@ -29,8 +29,9 @@ def main(args):
         save_pre_dir = './Data/IndianP/'
 
     X = np.load(save_pre_dir+'X.npy')
-    _,h,w = X.shape
+    num_features,h,w = X.shape
     Y = np.load(save_pre_dir+'Y.npy')
+    num_classes = int(Y.max())
     
     X_train = np.reshape(X,(1,num_features,h,w))
     train_array = np.load(save_pre_dir+'train_array.npy')
@@ -110,26 +111,22 @@ def main(args):
             save_path_prefix + args.model + '_' + DataName[args.dataID] + '_advimage' + str(epsilon[i]) + '.mat',
             {'advimage': X_adv})
 
+        def get_bands(b1, b2, b3, max_b):
+            return [min(b1, max_b), min(b2, max_b), min(b3, max_b)]
+        
         if args.dataID == 1:
-            im = Image.fromarray(np.moveaxis((noise_image[[102,56,31],:,:]*25500).astype('uint8'),0,-1))
-            im.save(save_path_prefix+args.model+'_perturbation'+str(epsilon[i])+'.png','png')
-            im = Image.fromarray(np.moveaxis((X_adv[[102,56,31],:,:]*255).astype('uint8'),0,-1))
-            im.save(save_path_prefix+args.model+'_advimage'+str(epsilon[i])+'.png','png')
+            bands = get_bands(102, 56, 31, num_features - 1)
         elif args.dataID == 2:
-            im = Image.fromarray(np.moveaxis((noise_image[[57,27,17],:,:]*25500).astype('uint8'),0,-1))
-            im.save(save_path_prefix+args.model+'_perturbation'+str(epsilon[i])+'.png','png')
-            im = Image.fromarray(np.moveaxis((X_adv[[57,27,17],:,:]*255).astype('uint8'),0,-1))
-            im.save(save_path_prefix+args.model+'_advimage'+str(epsilon[i])+'.png','png')
+            bands = get_bands(57, 27, 17, num_features - 1)
         elif args.dataID == 3:
-            im = Image.fromarray(np.moveaxis((noise_image[[50,40,20],:,:]*25500).astype('uint8'),0,-1))
-            im.save(save_path_prefix+args.model+'_perturbation'+str(epsilon[i])+'.png','png')
-            im = Image.fromarray(np.moveaxis((X_adv[[50,40,20],:,:]*255).astype('uint8'),0,-1))
-            im.save(save_path_prefix+args.model+'_advimage'+str(epsilon[i])+'.png','png')
+            bands = get_bands(50, 40, 20, num_features - 1)
         elif args.dataID == 4:
-            im = Image.fromarray(np.moveaxis((noise_image[[102,56,31],:,:]*25500).astype('uint8'),0,-1))
-            im.save(save_path_prefix+args.model+'_perturbation'+str(epsilon[i])+'.png','png')
-            im = Image.fromarray(np.moveaxis((X_adv[[102,56,31],:,:]*255).astype('uint8'),0,-1))
-            im.save(save_path_prefix+args.model+'_advimage'+str(epsilon[i])+'.png','png')
+            bands = get_bands(102, 56, 31, num_features - 1)
+            
+        im = Image.fromarray(np.moveaxis((noise_image[bands,:,:]*25500).astype('uint8'),0,-1))
+        im.save(save_path_prefix+args.model+'_perturbation'+str(epsilon[i])+'.png','png')
+        im = Image.fromarray(np.moveaxis((X_adv[bands,:,:]*255).astype('uint8'),0,-1))
+        im.save(save_path_prefix+args.model+'_advimage'+str(epsilon[i])+'.png','png')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -141,6 +138,6 @@ if __name__ == '__main__':
     # train
     parser.add_argument('--lr', type=float, default=5e-4)
     parser.add_argument('--decay', type=float, default=5e-5)
-    parser.add_argument('--bins', nargs='+', type=int)
+    parser.add_argument('--bins', nargs='+', type=int, default=[1, 2, 3, 6])
 
     main(parser.parse_args())
