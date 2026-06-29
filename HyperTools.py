@@ -185,7 +185,7 @@ def LoadHSI(dataID=1,num_label=150):
     K = row*col
     X = X.reshape(K, n_feature)       
     
-    n_class = Y.max()
+    n_class = int(Y.max())
 
     X = featureNormalize(X,2)  
     X = np.reshape(X,(row,col,n_feature))
