@@ -153,17 +153,11 @@ def LoadHSI(dataID=1,num_label=150):
         Y = data['salinas_gt']
 
     elif dataID==3:
-        import os
-        if os.path.exists('./Data/GRSS2013.mat'):
-            data = sio.loadmat('./Data/GRSS2013.mat')
-            X = data['GRSS2013']
-            data = sio.loadmat('./Data/GRSS2013_gt.mat')
-            Y = data['GRSS2013_gt']
-        else:
-            data = sio.loadmat('./Data/Houston13.mat')
-            X = data.get('Houston13', data.get('houston', data.get('GRSS2013')))
-            data = sio.loadmat('./Data/Houston13_7gt.mat')
-            Y = data.get('Houston13_7gt', data.get('houston_gt', data.get('GRSS2013_gt', data.get('Houston13_gt'))))
+        data = sio.loadmat('./Data/GRSS2013.mat')
+        X = data['GRSS2013']
+        data = sio.loadmat('./Data/GRSS2013_gt.mat')
+        Y = data['GRSS2013_gt']
+
     elif dataID==4:
         data = sio.loadmat('./Data/Indian_pines_corrected.mat')
         X = data['indian_pines_corrected']
