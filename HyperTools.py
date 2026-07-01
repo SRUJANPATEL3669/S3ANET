@@ -136,7 +136,8 @@ def CalAccuracy(predict,label):
         correct_sum[i] = np.sum(label[np.where(predict==i)]==i)
         reali[i] = np.sum(label==i)
         predicti[i] = np.sum(predict==i)
-        producerA[i] = correct_sum[i] / reali[i]
+        if reali[i] > 0:
+            producerA[i] = correct_sum[i] / reali[i]
    
     Kappa = (n*np.sum(correct_sum) - np.sum(reali * predicti)) *1.0/ (n*n - np.sum(reali * predicti))
     return OA,Kappa,producerA
