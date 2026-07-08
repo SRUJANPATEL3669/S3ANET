@@ -1,6 +1,7 @@
 import os
 import time
 import argparse
+import random
 import torch
 from torch.autograd import Variable
 from HyperTools import *
@@ -10,7 +11,18 @@ import utils_logger
 
 DataName = {1: 'PaviaU', 2: 'Salinas', 3: 'Houston',4:'IndianP'}
 
+def set_seed(seed=42):
+    """Fix all random seeds for full reproducibility across runs."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)          # for multi-GPU
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
 def main(args):
+    set_seed(42)
     if args.dataID == 1:
         num_classes = 9
         num_features = 103
