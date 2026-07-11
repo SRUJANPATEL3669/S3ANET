@@ -56,7 +56,7 @@ def main(args):
     Y_tar = np.reshape(Y_tar,(1,h,w))
     
 
-    save_path_prefix = args.save_path_prefix+'Exp_adv_'+DataName[args.dataID]+'/'
+    save_path_prefix = args.save_path_prefix+'Exp_adv_3D_'+DataName[args.dataID]+'/'
     
     if os.path.exists(save_path_prefix)==False:
         os.makedirs(save_path_prefix)
