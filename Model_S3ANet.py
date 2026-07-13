@@ -265,111 +265,64 @@ class FuCont_PSP_Spa(nn.Module):
 class SpectralSpatial3DFrontend(nn.Module):
     """
     Lightweight 3D CNN front-end for joint spectral-spatial feature extraction.
-
-    Processes the hyperspectral cube by treating spectral bands as the depth
-    dimension, capturing inter-band correlations that Conv2d ignores.
-
     Input : [B, 1, num_bands, H, W]  (5-D)
-    Output: [B, num_bands,   H, W]  (4-D) — drop-in replacement for raw input
-
-    Architecture
-    ------------
-    Stage 1 – pure spectral Conv3d  : kernel (spectral_kernel x 1 x 1)
-              Correlates adjacent spectral bands with no spatial mixing.
-    Stage 2 – joint spectral-spatial: kernel (5 x 3 x 3)
-              Captures combined spectral-spatial patterns.
-    Stage 3 – pointwise projection  : kernel (1 x 1 x 1)
-              Compresses back to 1 feature map so the spectral dim is preserved.
-    Residual – gated skip connection with a learnable sigmoid-scaled weight α
-              ensures stable training (α starts near 0.5, learned end-to-end).
+    Output: [B, num_bands,   H, W]  (4-D)
     """
 
-    def __init__(self, in_bands, num_filters=8, spectral_kernel=7):
+    def __init__(self, num_filters=8, spectral_kernel=7):
         super(SpectralSpatial3DFrontend, self).__init__()
         pad_s = spectral_kernel // 2
 
-        # Stage 1: pure spectral correlation
-        self.conv3d_1 = nn.Conv3d(
-            in_channels=1, out_channels=num_filters,
-            kernel_size=(spectral_kernel, 1, 1),
-            padding=(pad_s, 0, 0), bias=False
-        )
+        self.conv3d_1 = nn.Conv3d(1, num_filters, kernel_size=(spectral_kernel, 1, 1),
+                                   padding=(pad_s, 0, 0), bias=False)
         self.bn3d_1 = nn.BatchNorm3d(num_filters)
 
-        # Stage 2: joint spectral-spatial
-        self.conv3d_2 = nn.Conv3d(
-            in_channels=num_filters, out_channels=num_filters * 2,
-            kernel_size=(5, 3, 3),
-            padding=(2, 1, 1), bias=False
-        )
+        self.conv3d_2 = nn.Conv3d(num_filters, num_filters * 2, kernel_size=(5, 3, 3),
+                                   padding=(2, 1, 1), bias=False)
         self.bn3d_2 = nn.BatchNorm3d(num_filters * 2)
 
-        # Stage 3: pointwise projection back to 1 feature map
-        self.conv3d_3 = nn.Conv3d(
-            in_channels=num_filters * 2, out_channels=1,
-            kernel_size=1, bias=False
-        )
+        self.conv3d_3 = nn.Conv3d(num_filters * 2, 1, kernel_size=1, bias=False)
         self.bn3d_3 = nn.BatchNorm3d(1)
 
         self.relu = nn.ReLU(inplace=True)
-
-        # Gated residual: alpha is learned; sigmoid keeps it in (0,1)
-        # Initialised to 0 so the residual weight starts at sigmoid(0) = 0.5
-        self.alpha = nn.Parameter(torch.zeros(1))
+        self.alpha = nn.Parameter(torch.zeros(1))  # sigmoid(0)=0.5 gated residual
 
     def forward(self, x):
-        """
-        x: [B, 1, C, H, W]
-        Returns: [B, C, H, W]
-        """
+        """x: [B, 1, C, H, W] -> [B, C, H, W]"""
         residual = x
-        x = self.relu(self.bn3d_1(self.conv3d_1(x)))   # [B,  8, C, H, W]
-        x = self.relu(self.bn3d_2(self.conv3d_2(x)))   # [B, 16, C, H, W]
-        x = self.relu(self.bn3d_3(self.conv3d_3(x)))   # [B,  1, C, H, W]
-        x = x + torch.sigmoid(self.alpha) * residual   # gated residual
-        return x.squeeze(1)                             # [B, C, H, W]
+        x = self.relu(self.bn3d_1(self.conv3d_1(x)))
+        x = self.relu(self.bn3d_2(self.conv3d_2(x)))
+        x = self.relu(self.bn3d_3(self.conv3d_3(x)))
+        x = x + torch.sigmoid(self.alpha) * residual
+        return x.squeeze(1)
 
 
 class S3ANet(nn.Module):
     def __init__(self, num_features=103, num_classes=9, conv_features=64,
-                 bins=[1,2,3,6], in_dim=64, image_size=13, dim=1024,
-                 use_3d=True):
-        """
-        Args:
-            num_features  : number of input spectral bands
-            num_classes   : number of output classes
-            conv_features : base channel width for Conv2d backbone
-            bins          : pooling pyramid scales for PPM_Spa
-            use_3d        : if True, prepend a SpectralSpatial3DFrontend that
-                            jointly models spectral & spatial correlations before
-                            the Conv2d backbone.  Accepts 4-D input [B,C,H,W];
-                            the unsqueeze/squeeze is handled internally.
-        """
+                 bins=[1, 2, 3, 6], in_dim=64, image_size=13, dim=1024,
+                 use_3d=True, frontend_filters=8, frontend_spectral_kernel=7):
         super(S3ANet, self).__init__()
 
-        # ---- 3-D spectral-spatial front-end (optional) ----
         self.use_3d = use_3d
         if use_3d:
-            self.frontend_3d = SpectralSpatial3DFrontend(in_bands=num_features)
+            self.frontend_3d = SpectralSpatial3DFrontend(
+                num_filters=frontend_filters,
+                spectral_kernel=frontend_spectral_kernel
+            )
 
-        # ---- Conv2d backbone (unchanged) ----
-        self.conv0 = nn.Conv2d(num_features, conv_features, kernel_size=3, stride=1, padding=0, dilation=1,
-                               bias=True)
-        self.conv1 = nn.Conv2d(conv_features, conv_features, kernel_size=3, stride=1, padding=0, dilation=2,
-                               bias=True)
-        self.conv2 = nn.Conv2d(conv_features, conv_features, kernel_size=3, stride=1, padding=0, dilation=3,
-                               bias=True)
+        self.conv0 = nn.Conv2d(num_features, conv_features, kernel_size=3, stride=1, padding=0, dilation=1, bias=True)
+        self.conv1 = nn.Conv2d(conv_features, conv_features, kernel_size=3, stride=1, padding=0, dilation=2, bias=True)
+        self.conv2 = nn.Conv2d(conv_features, conv_features, kernel_size=3, stride=1, padding=0, dilation=3, bias=True)
         self.relu = nn.ReLU(inplace=True)
         self.sigmoid = nn.Sigmoid()
         self.avgpool = nn.AvgPool2d(kernel_size=2, stride=2, padding=0)
         self.dim = dim
 
-        self.conv_cls = nn.Conv2d(conv_features * 3, num_classes, kernel_size=1, stride=1, padding=0,
-                                  bias=True)
+        self.conv_cls = nn.Conv2d(conv_features * 3, num_classes, kernel_size=1, stride=1, padding=0, bias=True)
         self.drop = nn.Dropout(0.5)
         self.conv_features = conv_features
         self.num_features = num_features
-        self.bin = bin
+        self.bins = bins          # fixed: was `self.bin = bin` (builtin shadow bug)
         self.in_dim = in_dim
         self.image_size = image_size
         self.GST_block = GST_block(dim=64, heads=16, num_blocks=1)
@@ -379,15 +332,12 @@ class S3ANet(nn.Module):
         self.pos_embedding = nn.Parameter(torch.randn(1, self.num_patches + 1, self.dim)).cuda()
 
     def forward(self, x, mask=None):
-        ################## 3-D spectral-spatial front-end ##############
-        # Accepts standard 4-D input [B, C, H, W]; unsqueeze/squeeze handled here.
         if self.use_3d:
-            x = x.unsqueeze(1)          # [B, C, H, W]  ->  [B, 1, C, H, W]
-            x = self.frontend_3d(x)     # [B, 1, C, H, W]  ->  [B, C, H, W]
+            x = x.unsqueeze(1)          # [B, C, H, W] -> [B, 1, C, H, W]
+            x = self.frontend_3d(x)     # -> [B, C, H, W]
 
-        ################## Conv2d backbone (unchanged) ##############
         interpolation = nn.UpsamplingBilinear2d(size=x.shape[2:4])
-        x_copy = x.squeeze()
+
         x = self.relu(self.conv0(x))
         conv1 = x
 
@@ -396,12 +346,10 @@ class S3ANet(nn.Module):
         x = self.avgpool(x)
 
         x = self.relu(self.conv2(x))
-        x1 = x # skip connection
-        n, c, h, w = x.size()  # m* h/2 * w/2
+        x1 = x
         x = self.head(x)
 
-        ########################################
-        x = x +x1 # m* h/2 * w/2
+        x = x + x1
         x11 = self.GST_block(x)
 
         context3 = interpolation(x11)
