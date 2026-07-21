@@ -107,6 +107,15 @@ def main(args):
 
         Model.eval()
 
+        # ── Clean predictions (needed for ASR) ──────────────────────────────
+        with torch.no_grad():
+            clean_output = Model(images)
+        _, clean_labels = torch.max(clean_output, 1)
+        clean_pred = np.squeeze(clean_labels.cpu().numpy()).reshape(-1)
+
+        # Keep original numpy image for SAM / SID / physical-consistency
+        X_orig_np = images.cpu().data.numpy()[0]          # (C, H, W)
+
         # adversarial attack
         processed_image = Variable(images)
         processed_image = processed_image.requires_grad_()
@@ -145,12 +154,28 @@ def main(args):
         img = DrawResult(np.reshape(predict_labels + 1, -1), args.dataID, h, w)
         plt.imsave(save_path_prefix + args.model + '_FGSM_OA' + repr(int(OA2 * 10000)) + '_kappa' + repr(
             int(kappa2 * 10000)) + 'Epsilon' + str(args.epsilon) + '.png', img)
+
+        # ── Spectral / physical attack-quality metrics ───────────────────────
+        # X_adv_np: adversarial image as (C, H, W) numpy array
+        X_adv_np  = torch.clamp(processed_image, 0, 1).detach().cpu().numpy()[0]  # (C,H,W)
+
+        sam_val   = CalSAM(X_orig_np, X_adv_np)
+        sid_val   = CalSID(X_orig_np, X_adv_np)
+        print('Computing physical-consistency rate (may take a moment)...')
+        phys_rate = CalPhysicalConsistency(X_orig_np, X_adv_np, theta=5.0)
+        asr_val   = CalASR(clean_pred, predict_labels, Y, test_array)
+
         ######
         print('--------------------test Attack-----------------')
         print('OA=%.3f,Kappa=%.3f' % (OA2 * 100, kappa2 * 100))
         print('producerA:', (ProducerA2)*100)
         print('AA=%.3f' % (AA2*100))
         print('Train_time: %.2f, Test_time: %.2f, Runtime: %.2f' % (tr2_time, te2_time, tr2_time+te2_time))
+        print('── Spectral Attack Metrics ──────────────────────────────')
+        print('SAM  (mean spectral angle, deg)  : %.4f' % sam_val)
+        print('SID  (spectral info divergence)  : %.6f' % sid_val)
+        print('Physical-consistency rate (θ=5°) : %.4f  (%.2f%%)' % (phys_rate, phys_rate * 100))
+        print('ASR  (attack success rate)        : %.4f  (%.2f%%)' % (asr_val,   asr_val   * 100))
 
 
 if __name__ == '__main__':

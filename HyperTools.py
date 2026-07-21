@@ -215,3 +215,189 @@ def LoadHSI(dataID=1,num_label=150):
             test_array = np.append(test_array,index[randomArray_label[train_num:n_data]])
 
     return X,Y,train_array,test_array
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Spectral Attack Quality Metrics
+# ─────────────────────────────────────────────────────────────────────────────
+
+def CalSAM(X_orig, X_adv):
+    """
+    Spectral Angle Mapper (SAM) — physical-distance metric.
+
+    Measures the mean spectral angle (in degrees) between original and
+    adversarial pixels.  A larger angle means the perturbation moves pixels
+    further from their original spectral signature.
+
+    Parameters
+    ----------
+    X_orig : ndarray, shape (C, H, W) or (N, C)
+        Original (clean) hyperspectral image / pixel array.
+    X_adv  : ndarray, same shape as X_orig
+        Adversarial hyperspectral image / pixel array.
+
+    Returns
+    -------
+    mean_sam : float
+        Mean SAM across all pixels, in degrees.
+    """
+    # Flatten to (N, C)
+    if X_orig.ndim == 3:
+        C, H, W = X_orig.shape
+        X_orig = X_orig.reshape(C, -1).T          # (N, C)
+        X_adv  = X_adv.reshape(C, -1).T
+
+    eps = 1e-10
+    dot   = np.sum(X_orig * X_adv, axis=1)
+    norm1 = np.linalg.norm(X_orig, axis=1) + eps
+    norm2 = np.linalg.norm(X_adv,  axis=1) + eps
+    cos_angle = np.clip(dot / (norm1 * norm2), -1.0, 1.0)
+    sam_per_pixel = np.degrees(np.arccos(cos_angle))   # radians → degrees
+    mean_sam = float(np.mean(sam_per_pixel))
+    return mean_sam
+
+
+def CalSID(X_orig, X_adv):
+    """
+    Spectral Information Divergence (SID) — material-identity metric.
+
+    SID(p, q) = D_KL(p||q) + D_KL(q||p), where p and q are probability
+    distributions derived from spectral vectors by L1-normalisation.
+    A larger SID implies more change in spectral material identity.
+
+    Parameters
+    ----------
+    X_orig : ndarray, shape (C, H, W) or (N, C)
+    X_adv  : ndarray, same shape as X_orig
+
+    Returns
+    -------
+    mean_sid : float
+        Mean SID across all pixels (dimensionless).
+    """
+    if X_orig.ndim == 3:
+        C, H, W = X_orig.shape
+        X_orig = X_orig.reshape(C, -1).T
+        X_adv  = X_adv.reshape(C, -1).T
+
+    eps = 1e-10
+    # Shift to non-negative before L1-normalising (data should already be ≥0)
+    p = np.abs(X_orig) + eps
+    q = np.abs(X_adv)  + eps
+    p = p / p.sum(axis=1, keepdims=True)
+    q = q / q.sum(axis=1, keepdims=True)
+
+    kl_pq = np.sum(p * np.log(p / q + eps), axis=1)
+    kl_qp = np.sum(q * np.log(q / p + eps), axis=1)
+    sid_per_pixel = kl_pq + kl_qp
+    mean_sid = float(np.mean(sid_per_pixel))
+    return mean_sid
+
+
+def CalPhysicalConsistency(X_orig, X_adv, theta=5.0, n_endmembers=None):
+    """
+    Physical-consistency rate — fraction of adversarial pixels that pass an
+    unmixing round-trip test.
+
+    Algorithm
+    ---------
+    1. Estimate endmembers from X_orig via VCA-lite (random vertex search).
+    2. Solve NNLS abundances for every pixel in X_adv.
+    3. Reconstruct each pixel as A @ endmembers.
+    4. Compute SAM between X_adv pixel and its reconstruction.
+    5. Rate = fraction of pixels with SAM < theta (degrees).
+
+    Parameters
+    ----------
+    X_orig      : ndarray, shape (C, H, W) or (N, C)  — clean image
+    X_adv       : ndarray, same shape                  — adversarial image
+    theta       : float  (default 5.0°)                — SAM threshold
+    n_endmembers: int or None — number of endmembers;
+                  defaults to min(C, 10) if None.
+
+    Returns
+    -------
+    rate : float  ∈ [0, 1]   fraction of physically consistent pixels
+    """
+    from scipy.optimize import nnls
+
+    # Flatten to (N, C)
+    if X_orig.ndim == 3:
+        C, H, W = X_orig.shape
+        orig_2d = X_orig.reshape(C, -1).T    # (N, C)
+        adv_2d  = X_adv.reshape(C, -1).T
+    else:
+        orig_2d = X_orig.copy()
+        adv_2d  = X_adv.copy()
+
+    N, C = orig_2d.shape
+    if n_endmembers is None:
+        n_endmembers = min(C, 10)
+
+    # ── Endmember extraction (simplified VCA-style random search) ─────────────
+    np.random.seed(0)
+    endmember_idx = [np.random.randint(N)]
+    for _ in range(n_endmembers - 1):
+        # pick the pixel furthest from the current endmember set (greedy)
+        E = orig_2d[endmember_idx]               # (k, C)
+        dists = np.min(
+            np.sum((orig_2d[:, None, :] - E[None, :, :]) ** 2, axis=2),
+            axis=1
+        )
+        endmember_idx.append(int(np.argmax(dists)))
+    endmembers = orig_2d[endmember_idx]           # (n_endmembers, C)
+
+    # ── Abundance estimation + reconstruction ─────────────────────────────────
+    E_T = endmembers.T                             # (C, n_endmembers)
+    eps = 1e-10
+    consistent = 0
+    for pixel in adv_2d:
+        abund, _ = nnls(E_T, pixel)
+        recon    = E_T @ abund                     # (C,)
+        # SAM between adversarial pixel and its reconstruction
+        cos_a = np.dot(pixel, recon) / (
+            np.linalg.norm(pixel) * np.linalg.norm(recon) + eps
+        )
+        angle = np.degrees(np.arccos(np.clip(cos_a, -1.0, 1.0)))
+        if angle < theta:
+            consistent += 1
+
+    rate = consistent / N
+    return rate
+
+
+def CalASR(clean_pred, adv_pred, Y_true, test_array):
+    """
+    Attack Success Rate (ASR) — fraction of correctly-classified test pixels
+    that are flipped to a wrong class by the adversarial attack.
+
+    ASR = |{i ∈ test : clean_pred[i] == Y_true[i]  AND
+                        adv_pred[i]   != Y_true[i]}|
+          ─────────────────────────────────────────────
+                |{i ∈ test : clean_pred[i] == Y_true[i]}|
+
+    Parameters
+    ----------
+    clean_pred : ndarray, shape (N,)   — predictions on clean image
+    adv_pred   : ndarray, shape (N,)   — predictions on adversarial image
+    Y_true     : ndarray, shape (N,)   — ground-truth labels
+    test_array : ndarray               — indices of test pixels
+
+    Returns
+    -------
+    asr : float ∈ [0, 1]
+    """
+    y_true_test   = Y_true[test_array]
+    clean_test    = clean_pred[test_array]
+    adv_test      = adv_pred[test_array]
+
+    # Pixels that the clean model got right
+    correctly_classified = (clean_test == y_true_test)
+    n_correct = int(correctly_classified.sum())
+    if n_correct == 0:
+        return 0.0
+
+    # Among those, how many did the attack flip?
+    flipped = correctly_classified & (adv_test != y_true_test)
+    asr = float(flipped.sum()) / n_correct
+    return asr
