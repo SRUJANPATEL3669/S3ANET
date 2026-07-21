@@ -3,7 +3,6 @@ import time
 import argparse
 import random
 import torch
-import pandas as pd
 from torch.autograd import Variable
 from HyperTools import *
 from Model_S3ANet import *
@@ -46,7 +45,7 @@ def main(args):
     Y = np.load(save_pre_dir + 'Y.npy')
     num_classes = int(Y.max()) + 1
 
-    X_train = np.reshape(X, (1, num_features, h, w))
+    X_train = np.reshape(X, (1, 1, num_features, h, w))  # 5D: [batch, depth, channels, H, W]
     train_array = np.load(save_pre_dir + 'train_array.npy')
     test_array = np.load(save_pre_dir + 'test_array.npy')
     Y_train = np.ones(Y.shape) * 255
@@ -57,8 +56,8 @@ def main(args):
     Y_tar = np.zeros(Y.shape)
     Y_tar = np.reshape(Y_tar, (1, h, w))
 
-    save_path_prefix = args.save_path_prefix + 'Exp_3D_' + DataName[args.dataID] + '/'
-    save_log_prefix = args.save_path_prefix + 'log_3D_' + DataName[args.dataID] + '/'  # save_log_path
+    save_path_prefix = args.save_path_prefix + 'Exp_' + DataName[args.dataID] + '/'
+    save_log_prefix = args.save_path_prefix + 'log_' + DataName[args.dataID] + '/'  # save_log_path
     log_path = save_log_prefix + args.model + '.log'
 
 
@@ -78,7 +77,9 @@ def main(args):
         optimizer = torch.optim.Adam(Model.parameters(), lr=args.lr,weight_decay=args.decay)
 
 
-        images = torch.from_numpy(X_train).float().cuda()
+        images_5d = torch.from_numpy(X_train).float().cuda()  # [batch, depth, channels, H, W]
+        b, d, c, h_dim, w_dim = images_5d.shape
+        images = images_5d.view(b * d, c, h_dim, w_dim)  # reshape to 4D for Conv2d
         label = torch.from_numpy(Y_train).long().cuda()
         criterion = CrossEntropy2d().cuda()
 
@@ -121,10 +122,14 @@ def main(args):
 
         processed_image.data = processed_image.data - adv_noise
 
-        X_adv = torch.clamp(processed_image, 0, 1).cpu().data.numpy()[0]
-        X_adv = np.reshape(X_adv, (1, num_features, h, w))
+        X_adv_4d = torch.clamp(processed_image, 0, 1).cpu().data.numpy()  # [batch*depth, channels, H, W]
+        X_adv_4d = np.reshape(X_adv_4d, (b, d, num_features, h, w))       # restore to 5D: [batch, depth, channels, H, W]
+        X_adv = X_adv_4d[0, 0]                                              # [channels, H, W] for saving
+        X_adv = np.reshape(X_adv, (1, 1, num_features, h, w))               # 5D adv image for model input
 
-        adv_images = torch.from_numpy(X_adv).float().cuda()
+        adv_images_5d = torch.from_numpy(X_adv).float().cuda()  # [batch, depth, channels, H, W]
+        b2, d2, c2, h2, w2 = adv_images_5d.shape
+        adv_images = adv_images_5d.view(b2 * d2, c2, h2, w2)  # reshape to 4D for Conv2d
 
         # 对抗样本用于测试
         output = Model(adv_images)
@@ -146,31 +151,6 @@ def main(args):
         print('producerA:', (ProducerA2)*100)
         print('AA=%.3f' % (AA2*100))
         print('Train_time: %.2f, Test_time: %.2f, Runtime: %.2f' % (tr2_time, te2_time, tr2_time+te2_time))
-
-        # ---- Save results to Excel (appends across runs) ----
-        excel_path = save_path_prefix + args.model + '_3D_' + DataName[args.dataID] + '_results.xlsx'
-        result_row = {
-            'Dataset'       : DataName[args.dataID],
-            'Model'         : args.model + '_3D',
-            'Epsilon'       : args.epsilon,
-            'OA(%)'         : round(OA2  * 100, 3),
-            'Kappa(%)'      : round(kappa2 * 100, 3),
-            'AA(%)'         : round(AA2  * 100, 3),
-            'Train_Time(s)' : round(tr2_time, 2),
-            'Test_Time(s)'  : round(te2_time, 2),
-            'Total_Time(s)' : round(tr2_time + te2_time, 2),
-        }
-        for cls_i, pa in enumerate(ProducerA2):
-            result_row[f'Class{cls_i + 1}_PA(%)'] = round(pa * 100, 3)
-
-        df_new = pd.DataFrame([result_row])
-        if os.path.exists(excel_path):
-            df_existing = pd.read_excel(excel_path)
-            df_combined = pd.concat([df_existing, df_new], ignore_index=True)
-        else:
-            df_combined = df_new
-        df_combined.to_excel(excel_path, index=False)
-        print(f'Results saved to: {excel_path}')
 
 
 if __name__ == '__main__':

@@ -45,7 +45,7 @@ def main(args):
     Y = np.load(save_pre_dir+'Y.npy')
     num_classes = int(Y.max()) + 1
     
-    X_train = np.reshape(X,(1,num_features,h,w))
+    X_train = np.reshape(X, (1, 1, num_features, h, w))  # 5D: [batch, depth, channels, H, W]
     train_array = np.load(save_pre_dir+'train_array.npy')
     Y_train = np.ones(Y.shape)*255
     Y_train[train_array] = Y[train_array]
@@ -56,7 +56,7 @@ def main(args):
     Y_tar = np.reshape(Y_tar,(1,h,w))
     
 
-    save_path_prefix = args.save_path_prefix+'Exp_adv_3D_'+DataName[args.dataID]+'/'
+    save_path_prefix = args.save_path_prefix+'Exp_adv_'+DataName[args.dataID]+'/'
     
     if os.path.exists(save_path_prefix)==False:
         os.makedirs(save_path_prefix)
@@ -70,7 +70,9 @@ def main(args):
     Model.train()
     optimizer = torch.optim.Adam(Model.parameters(),lr=args.lr,weight_decay=args.decay)
 
-    images = torch.from_numpy(X_train).float().cuda()
+    images_5d = torch.from_numpy(X_train).float().cuda()  # [batch, depth, channels, H, W]
+    b, d, c, h_dim, w_dim = images_5d.shape
+    images = images_5d.view(b * d, c, h_dim, w_dim)  # reshape to 4D for Conv2d
     label = torch.from_numpy(Y_train).long().cuda()
     criterion = CrossEntropy2d().cuda()      
 
@@ -111,7 +113,9 @@ def main(args):
 
         processed_image.data = processed_image.data - adv_noise
        
-        X_adv = torch.clamp(processed_image, 0, 1).cpu().data.numpy()[0]
+        X_adv_4d = torch.clamp(processed_image, 0, 1).cpu().data.numpy()  # [batch*depth, channels, H, W]
+        X_adv_4d = np.reshape(X_adv_4d, (b, d, num_features, h, w))       # restore to 5D: [batch, depth, channels, H, W]
+        X_adv = X_adv_4d[0, 0]                                              # [channels, H, W] for saving
         noise_image = X_adv - images.cpu().data.numpy()[0]        
         noise_image[noise_image > 1] = 1
         noise_image[noise_image < 0] = 0

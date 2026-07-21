@@ -262,82 +262,40 @@ class FuCont_PSP_Spa(nn.Module):
             x = cont_p  # recurrent
         return x
 
-class SpectralSpatial3DFrontend(nn.Module):
-    """
-    Lightweight 3D CNN front-end for joint spectral-spatial feature extraction.
-    Input : [B, 1, num_bands, H, W]  (5-D)
-    Output: [B, num_bands,   H, W]  (4-D)
-    """
-
-    def __init__(self, num_filters=8, spectral_kernel=7):
-        super(SpectralSpatial3DFrontend, self).__init__()
-        pad_s = spectral_kernel // 2
-
-        self.conv3d_1 = nn.Conv3d(1, num_filters, kernel_size=(spectral_kernel, 1, 1),
-                                   padding=(pad_s, 0, 0), bias=False)
-        self.bn3d_1 = nn.BatchNorm3d(num_filters)
-
-        self.conv3d_2 = nn.Conv3d(num_filters, num_filters * 2, kernel_size=(5, 3, 3),
-                                   padding=(2, 1, 1), bias=False)
-        self.bn3d_2 = nn.BatchNorm3d(num_filters * 2)
-
-        self.conv3d_3 = nn.Conv3d(num_filters * 2, 1, kernel_size=1, bias=False)
-        self.bn3d_3 = nn.BatchNorm3d(1)
-
-        self.relu = nn.ReLU(inplace=True)
-        self.alpha = nn.Parameter(torch.zeros(1))  # sigmoid(0)=0.5 gated residual
-
-    def forward(self, x):
-        """x: [B, 1, C, H, W] -> [B, C, H, W]"""
-        residual = x
-        x = self.relu(self.bn3d_1(self.conv3d_1(x)))
-        x = self.relu(self.bn3d_2(self.conv3d_2(x)))
-        x = self.relu(self.bn3d_3(self.conv3d_3(x)))
-        x = x + torch.sigmoid(self.alpha) * residual
-        return x.squeeze(1)
-
-
 class S3ANet(nn.Module):
     def __init__(self, num_features=103, num_classes=9, conv_features=64,
-                 bins=[1, 2, 3, 6], in_dim=64, image_size=13, dim=1024,
-                 use_3d=True, frontend_filters=8, frontend_spectral_kernel=7):
+                 bins=[1,2,3,6],in_dim=64,image_size=13,dim=1024):
         super(S3ANet, self).__init__()
 
-        self.use_3d = use_3d
-        if use_3d:
-            self.frontend_3d = SpectralSpatial3DFrontend(
-                num_filters=frontend_filters,
-                spectral_kernel=frontend_spectral_kernel
-            )
-
-        self.conv0 = nn.Conv2d(num_features, conv_features, kernel_size=3, stride=1, padding=0, dilation=1, bias=True)
-        self.conv1 = nn.Conv2d(conv_features, conv_features, kernel_size=3, stride=1, padding=0, dilation=2, bias=True)
-        self.conv2 = nn.Conv2d(conv_features, conv_features, kernel_size=3, stride=1, padding=0, dilation=3, bias=True)
+        self.conv0 = nn.Conv2d(num_features, conv_features, kernel_size=3, stride=1, padding=0, dilation=1,
+                               bias=True)
+        self.conv1 = nn.Conv2d(conv_features, conv_features, kernel_size=3, stride=1, padding=0, dilation=2,
+                               bias=True)
+        self.conv2 = nn.Conv2d(conv_features, conv_features, kernel_size=3, stride=1, padding=0, dilation=3,  # 3
+                               bias=True)
         self.relu = nn.ReLU(inplace=True)
         self.sigmoid = nn.Sigmoid()
         self.avgpool = nn.AvgPool2d(kernel_size=2, stride=2, padding=0)
         self.dim = dim
 
-        self.conv_cls = nn.Conv2d(conv_features * 3, num_classes, kernel_size=1, stride=1, padding=0, bias=True)
+        self.conv_cls = nn.Conv2d(conv_features * 3, num_classes, kernel_size=1, stride=1, padding=0,
+                                  bias=True)
         self.drop = nn.Dropout(0.5)
         self.conv_features = conv_features
         self.num_features = num_features
-        self.bins = bins          # fixed: was `self.bin = bin` (builtin shadow bug)
+        self.bin = bin
         self.in_dim = in_dim
         self.image_size = image_size
-        self.GST_block = GST_block(dim=64, heads=16, num_blocks=1)
-        self.head = PPM_Spa(conv_features, conv_features, bins)
+        self.GST_block = GST_block(dim=64,heads=16,num_blocks=1)
+        self.head = PPM_Spa(conv_features,conv_features,bins)
 
     def re_init(self):
         self.pos_embedding = nn.Parameter(torch.randn(1, self.num_patches + 1, self.dim)).cuda()
 
     def forward(self, x, mask=None):
-        if self.use_3d:
-            x = x.unsqueeze(1)          # [B, C, H, W] -> [B, 1, C, H, W]
-            x = self.frontend_3d(x)     # -> [B, C, H, W]
-
+        ################## backbone ##############
         interpolation = nn.UpsamplingBilinear2d(size=x.shape[2:4])
-
+        x_copy = x.squeeze()
         x = self.relu(self.conv0(x))
         conv1 = x
 
@@ -346,10 +304,12 @@ class S3ANet(nn.Module):
         x = self.avgpool(x)
 
         x = self.relu(self.conv2(x))
-        x1 = x
+        x1 = x # skip connection
+        n, c, h, w = x.size()  # m* h/2 * w/2
         x = self.head(x)
 
-        x = x + x1
+        ########################################
+        x = x +x1 # m* h/2 * w/2
         x11 = self.GST_block(x)
 
         context3 = interpolation(x11)
