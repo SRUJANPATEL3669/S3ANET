@@ -23,6 +23,8 @@ def set_seed(seed=42):
 
 def main(args):
     set_seed(42)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f'Using device: {device}')
     if args.dataID == 1:
         num_classes = 9
         num_features = 103
@@ -67,21 +69,18 @@ def main(args):
         os.makedirs(save_log_prefix)
 
     if args.model == 'S3ANet':
-        Model = S3ANet(num_features=num_features, num_classes=num_classes, bins=args.bins).cuda()
+        Model = S3ANet(num_features=num_features, num_classes=num_classes, bins=args.bins).to(device)
         num_epochs = args.epoch
 
-
-
-        Model = Model.cuda()
         Model.train()
         optimizer = torch.optim.Adam(Model.parameters(), lr=args.lr,weight_decay=args.decay)
 
 
-        images_5d = torch.from_numpy(X_train).float().cuda()  # [batch, depth, channels, H, W]
+        images_5d = torch.from_numpy(X_train).float().to(device)  # [batch, depth, channels, H, W]
         b, d, c, h_dim, w_dim = images_5d.shape
         images = images_5d.view(b * d, c, h_dim, w_dim)  # reshape to 4D for Conv2d
-        label = torch.from_numpy(Y_train).long().cuda()
-        criterion = CrossEntropy2d().cuda()
+        label = torch.from_numpy(Y_train).long().to(device)
+        criterion = CrossEntropy2d().to(device)
 
         t1 = time.time()
         # train the classification model
@@ -107,11 +106,25 @@ def main(args):
 
         Model.eval()
 
-        # ── Clean predictions (needed for ASR) ──────────────────────────────
+        # ── Clean predictions ────────────────────────────────────────────────
         with torch.no_grad():
             clean_output = Model(images)
         _, clean_labels = torch.max(clean_output, 1)
         clean_pred = np.squeeze(clean_labels.cpu().numpy()).reshape(-1)
+
+        # Save clean classification map image (only generated once; skipped if already exists)
+        OA_clean, kappa_clean, ProducerA_clean = CalAccuracy(clean_pred[test_array], Y[test_array])
+        AA_clean = np.mean(ProducerA_clean)
+        clean_map_path = (save_path_prefix + args.model + '_clean'
+                          + '_OA'    + repr(int(OA_clean    * 10000))
+                          + '_kappa' + repr(int(kappa_clean * 10000))
+                          + '.png')
+        if not os.path.exists(clean_map_path):
+            img_clean = DrawResult(np.reshape(clean_pred + 1, -1), args.dataID, h, w)
+            plt.imsave(clean_map_path, img_clean)
+            print('Clean map saved -> ' + clean_map_path)
+        else:
+            print('Clean map already exists, skipping -> ' + clean_map_path)
 
         # Keep original numpy image for SAM / SID / physical-consistency
         X_orig_np = images.cpu().data.numpy()[0]          # (C, H, W)
@@ -119,7 +132,7 @@ def main(args):
         # adversarial attack
         processed_image = Variable(images)
         processed_image = processed_image.requires_grad_()
-        label_tar = torch.from_numpy(Y_tar).long().cuda()
+        label_tar = torch.from_numpy(Y_tar).long().to(device)
 
         # 生成对抗样本
         output  = Model(processed_image)
@@ -136,7 +149,7 @@ def main(args):
         X_adv = X_adv_4d[0, 0]                                              # [channels, H, W] for saving
         X_adv = np.reshape(X_adv, (1, 1, num_features, h, w))               # 5D adv image for model input
 
-        adv_images_5d = torch.from_numpy(X_adv).float().cuda()  # [batch, depth, channels, H, W]
+        adv_images_5d = torch.from_numpy(X_adv).float().to(device)  # [batch, depth, channels, H, W]
         b2, d2, c2, h2, w2 = adv_images_5d.shape
         adv_images = adv_images_5d.view(b2 * d2, c2, h2, w2)  # reshape to 4D for Conv2d
 
@@ -166,16 +179,28 @@ def main(args):
         asr_val   = CalASR(clean_pred, predict_labels, Y, test_array)
 
         ######
-        print('--------------------test Attack-----------------')
-        print('OA=%.3f,Kappa=%.3f' % (OA2 * 100, kappa2 * 100))
-        print('producerA:', (ProducerA2)*100)
-        print('AA=%.3f' % (AA2*100))
-        print('Train_time: %.2f, Test_time: %.2f, Runtime: %.2f' % (tr2_time, te2_time, tr2_time+te2_time))
-        print('── Spectral Attack Metrics ──────────────────────────────')
+        print('─' * 55)
+        print('── Clean Baseline ───────────────────────────────────')
+        print('OA    : %.3f %%' % (OA_clean    * 100))
+        print('Kappa : %.3f %%' % (kappa_clean * 100))
+        print('AA    : %.3f %%' % (AA_clean    * 100))
+        print('─' * 55)
+        print('── After FGSM Attack (ε=%.4f) ───────────────────────' % args.epsilon)
+        print('OA    : %.3f %%' % (OA2    * 100))
+        print('Kappa : %.3f %%' % (kappa2 * 100))
+        print('AA    : %.3f %%' % (AA2    * 100))
+        print('producerA:', (ProducerA2) * 100)
+        print('Train_time: %.2f, Test_time: %.2f, Runtime: %.2f' % (tr2_time, te2_time, tr2_time + te2_time))
+        print('─' * 55)
+        print('── Spectral Attack Metrics ──────────────────────────')
         print('SAM  (mean spectral angle, deg)  : %.4f' % sam_val)
         print('SID  (spectral info divergence)  : %.6f' % sid_val)
         print('Physical-consistency rate (θ=5°) : %.4f  (%.2f%%)' % (phys_rate, phys_rate * 100))
         print('ASR  (attack success rate)        : %.4f  (%.2f%%)' % (asr_val,   asr_val   * 100))
+        print('─' * 55)
+        # ── Notebook-compatible summary (parsed by S3ANet_Experiments.ipynb) ──
+        print('OA=%.3f,Kappa=%.3f' % (OA2 * 100, kappa2 * 100))
+        print('AA=%.3f' % (AA2 * 100))
 
 
 if __name__ == '__main__':

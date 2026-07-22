@@ -250,7 +250,7 @@ class FuCont_PSP_Spa(nn.Module):
                 START_W[i, j] = start_w
                 END_W[i, j] = end_w
 
-        cont_p = torch.zeros(x.shape).cuda()
+        cont_p = torch.zeros(x.shape, device=x.device)
 
         for cnt in range(2):
             value = self.value_conv_p(x)

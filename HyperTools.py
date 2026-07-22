@@ -335,6 +335,9 @@ def CalPhysicalConsistency(X_orig, X_adv, theta=5.0, n_endmembers=None):
         n_endmembers = min(C, 10)
 
     # ── Endmember extraction (simplified VCA-style random search) ─────────────
+    # Save global numpy random state so the local seed(0) here does not
+    # corrupt the reproducibility guarantee established by set_seed(42).
+    _rng_state = np.random.get_state()
     np.random.seed(0)
     endmember_idx = [np.random.randint(N)]
     for _ in range(n_endmembers - 1):
@@ -346,6 +349,7 @@ def CalPhysicalConsistency(X_orig, X_adv, theta=5.0, n_endmembers=None):
         )
         endmember_idx.append(int(np.argmax(dists)))
     endmembers = orig_2d[endmember_idx]           # (n_endmembers, C)
+    np.random.set_state(_rng_state)               # restore global state
 
     # ── Abundance estimation + reconstruction ─────────────────────────────────
     E_T = endmembers.T                             # (C, n_endmembers)
