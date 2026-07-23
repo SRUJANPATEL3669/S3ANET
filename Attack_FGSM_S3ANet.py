@@ -147,6 +147,12 @@ def main(args):
         X_adv_4d = torch.clamp(processed_image, 0, 1).cpu().data.numpy()  # [batch*depth, channels, H, W]
         X_adv_4d = np.reshape(X_adv_4d, (b, d, num_features, h, w))       # restore to 5D: [batch, depth, channels, H, W]
         X_adv = X_adv_4d[0, 0]                                              # [channels, H, W] for saving
+
+        # Save perturbed data to disk so it can be reloaded later without re-running the attack
+        adv_npy_path = save_path_prefix + args.model + '_FGSM_Xadv_eps' + str(args.epsilon) + '.npy'
+        np.save(adv_npy_path, X_adv)   # shape: (C, H, W)
+        print('Adversarial data saved -> ' + adv_npy_path)
+
         X_adv = np.reshape(X_adv, (1, 1, num_features, h, w))               # 5D adv image for model input
 
         adv_images_5d = torch.from_numpy(X_adv).float().to(device)  # [batch, depth, channels, H, W]
@@ -201,6 +207,39 @@ def main(args):
         # ── Notebook-compatible summary (parsed by S3ANet_Experiments.ipynb) ──
         print('OA=%.3f,Kappa=%.3f' % (OA2 * 100, kappa2 * 100))
         print('AA=%.3f' % (AA2 * 100))
+
+        # ── Save all metrics to a results text file ──────────────────────────
+        results_txt_path = (save_path_prefix + args.model
+                            + '_FGSM_results_eps' + str(args.epsilon) + '.txt')
+        with open(results_txt_path, 'w') as f:
+            f.write('Model   : %s\n' % args.model)
+            f.write('Dataset : %s\n' % DataName[args.dataID])
+            f.write('Epsilon : %.4f\n' % args.epsilon)
+            f.write('─' * 55 + '\n')
+            f.write('── Clean Baseline (model on unperturbed data) ────\n')
+            f.write('OA    : %.3f %%\n' % (OA_clean    * 100))
+            f.write('Kappa : %.3f %%\n' % (kappa_clean * 100))
+            f.write('AA    : %.3f %%\n' % (AA_clean    * 100))
+            f.write('ProducerA: %s\n'   % str(ProducerA_clean * 100))
+            f.write('─' * 55 + '\n')
+            f.write('── Clean Model on Perturbed Data (FGSM Attack) ───\n')
+            f.write('OA    : %.3f %%\n' % (OA2    * 100))
+            f.write('Kappa : %.3f %%\n' % (kappa2 * 100))
+            f.write('AA    : %.3f %%\n' % (AA2    * 100))
+            f.write('ProducerA: %s\n'   % str(ProducerA2 * 100))
+            f.write('Train_time: %.2f s\n'  % tr2_time)
+            f.write('Test_time : %.2f s\n'  % te2_time)
+            f.write('Runtime   : %.2f s\n'  % (tr2_time + te2_time))
+            f.write('─' * 55 + '\n')
+            f.write('── Spectral Attack Metrics ───────────────────────\n')
+            f.write('SAM  (mean spectral angle, deg)  : %.4f\n'         % sam_val)
+            f.write('SID  (spectral info divergence)  : %.6f\n'         % sid_val)
+            f.write('Physical-consistency rate (θ=5°) : %.4f (%.2f%%)\n' % (phys_rate, phys_rate * 100))
+            f.write('ASR  (attack success rate)        : %.4f (%.2f%%)\n' % (asr_val,   asr_val   * 100))
+            f.write('─' * 55 + '\n')
+            f.write('Adversarial data : %s\n' % adv_npy_path)
+            f.write('Clean map        : %s\n' % clean_map_path)
+        print('Results saved -> ' + results_txt_path)
 
 
 if __name__ == '__main__':
