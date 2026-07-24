@@ -129,20 +129,22 @@ def main(args):
         # Keep original numpy image for SAM / SID / physical-consistency
         X_orig_np = images.cpu().data.numpy()[0]          # (C, H, W)
 
-        # adversarial attack
-        processed_image = Variable(images)
+        # adversarial attack (untargeted FGSM)
+        # Standard FGSM: x_adv = x + ε * sign(∇_x L(x, y_true))
+        # sign() gives every pixel/channel the FULL ε perturbation.
+        # Old code divided by the L∞-norm, leaving most pixels nearly untouched.
+        processed_image = Variable(images.clone())
         processed_image = processed_image.requires_grad_()
-        label_tar = torch.from_numpy(Y_tar).long().to(device)
 
-        # 生成对抗样本
+        # 生成对抗样本 (untargeted: maximise loss on TRUE labels)
         output  = Model(processed_image)
-        seg_loss = criterion(output, label_tar)
+        seg_loss = criterion(output, label)   # <-- true labels, not label_tar
         #### Test time #####
         te1_time = time.time()
         seg_loss.backward()
-        adv_noise = args.epsilon * processed_image.grad.data / torch.norm(processed_image.grad.data, float("inf"))
+        adv_noise = args.epsilon * processed_image.grad.data.sign()  # standard FGSM
 
-        processed_image.data = processed_image.data - adv_noise
+        processed_image.data = processed_image.data + adv_noise      # + not -
 
         X_adv_4d = torch.clamp(processed_image, 0, 1).cpu().data.numpy()  # [batch*depth, channels, H, W]
         X_adv_4d = np.reshape(X_adv_4d, (b, d, num_features, h, w))       # restore to 5D: [batch, depth, channels, H, W]

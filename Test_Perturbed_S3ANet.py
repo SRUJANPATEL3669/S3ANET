@@ -103,7 +103,7 @@ def run_one(args) -> dict:
     Y_train[train_array] = Y[train_array]
     Y_train = np.reshape(Y_train, (1, h, w))                # (1, H, W)
 
-    # Targeted label for FGSM (push everything toward class 0)
+    # NOTE: Y_tar kept for reference but untargeted FGSM is used below
     Y_tar = np.zeros(Y.shape, dtype=np.int64)
     Y_tar = np.reshape(Y_tar, (1, h, w))
 
@@ -170,21 +170,22 @@ def run_one(args) -> dict:
     # Keep numpy array for spectral metrics
     X_orig_np = images.cpu().data.numpy()[0]                 # (C, H, W)
 
-    # ── FGSM adversarial attack ───────────────────────────────────────────────
+    # ── FGSM adversarial attack (untargeted) ─────────────────────────────────
+    # Standard FGSM: x_adv = x + ε * sign(∇_x L(x, y_true))
+    # Using sign() ensures EVERY pixel/channel receives the full ε perturbation.
+    # Dividing by L∞-norm (old code) left most pixels nearly unperturbed.
     print(f'Generating FGSM adversarial example (ε={args.epsilon})...')
     te_start = time.time()
 
     processed_image = Variable(images.clone()).requires_grad_(True)
     out_atk  = Model(processed_image)
-    loss_atk = criterion(out_atk, label_tar)
+    # Untargeted attack: maximise loss on TRUE labels → accuracy drops sharply
+    loss_atk = criterion(out_atk, label)
     loss_atk.backward()
 
-    adv_noise = (
-        args.epsilon
-        * processed_image.grad.data
-        / torch.norm(processed_image.grad.data, float('inf'))
-    )
-    processed_image.data = processed_image.data - adv_noise
+    # Standard FGSM sign step (adds noise in gradient direction to increase loss)
+    adv_noise = args.epsilon * processed_image.grad.data.sign()
+    processed_image.data = processed_image.data + adv_noise
 
     # Clamp to [0, 1] and recover numpy (C, H, W)
     X_adv_np = torch.clamp(processed_image, 0, 1).detach().cpu().numpy()[0]
