@@ -283,14 +283,15 @@ class S3ANet(nn.Module):
         self.drop = nn.Dropout(0.5)
         self.conv_features = conv_features
         self.num_features = num_features
-        self.bin = bin
+        self.bin = bins
         self.in_dim = in_dim
         self.image_size = image_size
         self.GST_block = GST_block(dim=64,heads=16,num_blocks=1)
         self.head = PPM_Spa(conv_features,conv_features,bins)
 
-    def re_init(self):
-        self.pos_embedding = nn.Parameter(torch.randn(1, self.num_patches + 1, self.dim)).cuda()
+    def re_init(self, num_patches=100):
+        device = next(self.parameters()).device
+        self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, self.dim, device=device))
 
     def forward(self, x, mask=None):
         ################## backbone ##############

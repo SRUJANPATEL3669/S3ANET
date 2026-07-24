@@ -118,12 +118,15 @@ def main(args):
     print(f'Training finished in {train_time:.2f}s\n')
 
     # ── Clean evaluation ─────────────────────────────────────────────────────
+    test_start = time.time()
     Model.eval()
     with torch.no_grad():
         output = Model(images)
 
     _, predict_labels = torch.max(output, 1)
     predict_labels = np.squeeze(predict_labels.cpu().numpy()).reshape(-1)
+
+    test_time = time.time() - test_start
 
     OA, kappa, ProducerA = CalAccuracy(predict_labels[test_array], Y[test_array])
     AA = np.mean(ProducerA)
@@ -143,9 +146,10 @@ def main(args):
     print(f'OA      : {OA    * 100:.3f} %')
     print(f'Kappa   : {kappa * 100:.3f} %')
     print(f'AA      : {AA    * 100:.3f} %')
-    print('ProducerA (per class):')
-    for i, pa in enumerate(ProducerA):
-        print(f'  Class {i:2d}: {pa * 100:.3f} %')
+    print('producerA:', str(ProducerA * 100))
+    print('Train_time: %.2f, Test_time: %.2f, Runtime: %.2f' % (train_time, test_time, train_time + test_time))
+    print('OA=%.3f,Kappa=%.3f' % (OA * 100, kappa * 100))
+    print('AA=%.3f' % (AA * 100))
     print(f'Map saved -> {map_path}')
 
     # ── Spectral / physical metrics (clean baseline) ─────────────────────────

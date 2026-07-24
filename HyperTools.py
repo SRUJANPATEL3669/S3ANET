@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.io as sio  
+import torch
 
 def featureNormalize(X,type):
     #type==1 x = (x-mean)/std(x)
@@ -127,19 +128,21 @@ def DrawResult(labels,imageID,h=None,w=None):
 def CalAccuracy(predict,label):
     n = label.shape[0]
     OA = np.sum(predict==label)*1.0/n
-    correct_sum = np.zeros((max(label)+1))
-    reali = np.zeros((max(label)+1))
-    predicti = np.zeros((max(label)+1))
-    producerA = np.zeros((max(label)+1))
+    max_lbl = int(np.max(label)) if label.size > 0 else 0
+    correct_sum = np.zeros((max_lbl+1))
+    reali = np.zeros((max_lbl+1))
+    predicti = np.zeros((max_lbl+1))
+    producerA = np.zeros((max_lbl+1))
     
-    for i in range(0,max(label)+1):
+    for i in range(0, max_lbl+1):
         correct_sum[i] = np.sum(label[np.where(predict==i)]==i)
         reali[i] = np.sum(label==i)
         predicti[i] = np.sum(predict==i)
         if reali[i] > 0:
             producerA[i] = correct_sum[i] / reali[i]
    
-    Kappa = (n*np.sum(correct_sum) - np.sum(reali * predicti)) *1.0/ (n*n - np.sum(reali * predicti))
+    denom = (n*n - np.sum(reali * predicti))
+    Kappa = (n*np.sum(correct_sum) - np.sum(reali * predicti)) * 1.0 / denom if denom != 0 else 0.0
     return OA,Kappa,producerA
 
 def LoadHSI(dataID=1,num_label=150):
@@ -405,3 +408,61 @@ def CalASR(clean_pred, adv_pred, Y_true, test_array):
     flipped = correctly_classified & (adv_test != y_true_test)
     asr = float(flipped.sum()) / n_correct
     return asr
+
+
+def Apply_S3ANet_Defense(X_adv):
+    """
+    S3ANet Spatial-Spectral Defense Algorithm:
+    Removes high-frequency adversarial perturbations from hyperspectral data
+    by applying spatial median filtering combined with spectral smoothing,
+    restoring physical spatial-spectral manifold consistency.
+
+    Parameters
+    ----------
+    X_adv : ndarray, shape (C, H, W) or torch.Tensor (1, C, H, W)
+
+    Returns
+    -------
+    X_defended : same type and shape as X_adv
+    """
+    is_tensor = False
+    if isinstance(X_adv, torch.Tensor):
+        is_tensor = True
+        device = X_adv.device
+        X_np = X_adv.detach().cpu().numpy()
+        was_4d = (X_np.ndim == 4)
+        if was_4d:
+            X_np = X_np[0]
+    else:
+        X_np = X_adv.copy()
+        was_4d = (X_np.ndim == 4)
+        if was_4d:
+            X_np = X_np[0]
+
+    from scipy.ndimage import median_filter
+    C, H, W = X_np.shape
+    X_def_spatial = np.zeros_like(X_np)
+
+    # 1. Spatial median filtering per band to eliminate spatial adversarial noise spikes
+    for c in range(C):
+        X_def_spatial[c] = median_filter(X_np[c], size=3)
+
+    # 2. Spectral smoothing (3-band moving average) to enforce spectral continuity
+    X_def_spectral = np.zeros_like(X_def_spatial)
+    for c in range(C):
+        c_min = max(0, c - 1)
+        c_max = min(C, c + 2)
+        X_def_spectral[c] = np.mean(X_def_spatial[c_min:c_max], axis=0)
+
+    # 3. Blend spatial and spectral defense outputs
+    X_defended = 0.5 * X_def_spatial + 0.5 * X_def_spectral
+    X_defended = np.clip(X_defended, 0.0, 1.0)
+
+    if is_tensor:
+        if was_4d:
+            X_defended = np.expand_dims(X_defended, axis=0)
+        return torch.from_numpy(X_defended).float().to(device)
+    else:
+        if was_4d:
+            X_defended = np.expand_dims(X_defended, axis=0)
+        return X_defended

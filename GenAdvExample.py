@@ -61,20 +61,19 @@ def main(args):
     if os.path.exists(save_path_prefix)==False:
         os.makedirs(save_path_prefix)
     
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     num_epochs = 100
     if args.model == 'S3ANet':
-        Model = S3ANet(num_features=num_features, num_classes=num_classes, bins=args.bins).cuda()
-
-
+        Model = S3ANet(num_features=num_features, num_classes=num_classes, bins=args.bins).to(device)
 
     Model.train()
     optimizer = torch.optim.Adam(Model.parameters(),lr=args.lr,weight_decay=args.decay)
 
-    images_5d = torch.from_numpy(X_train).float().cuda()  # [batch, depth, channels, H, W]
+    images_5d = torch.from_numpy(X_train).float().to(device)  # [batch, depth, channels, H, W]
     b, d, c, h_dim, w_dim = images_5d.shape
     images = images_5d.view(b * d, c, h_dim, w_dim)  # reshape to 4D for Conv2d
-    label = torch.from_numpy(Y_train).long().cuda()
-    criterion = CrossEntropy2d().cuda()      
+    label = torch.from_numpy(Y_train).long().to(device)
+    criterion = CrossEntropy2d().to(device)      
 
     # train the classification model
     for epoch in range(num_epochs):  
@@ -101,17 +100,14 @@ def main(args):
     epsilon = [0.01,0.02,0.04,0.06,0.08,0.1,0.2,0.4,0.6,0.8,1,2,4,6,8,10]
     for i in range(len(epsilon)):
         print('Generate adversarial example with epsilon = %.2f'%(epsilon[i]))
-        processed_image = Variable(images)
-        processed_image = processed_image.requires_grad_()
-        label = torch.from_numpy(Y_tar).long().cuda()
-                                                                    
+        processed_image = Variable(images.clone()).requires_grad_(True)
+        
         output = Model(processed_image)
-        seg_loss = criterion(output,label)
+        seg_loss = criterion(output, label)   # untargeted attack on true labels
         seg_loss.backward()
         
-        adv_noise = epsilon[i] * processed_image.grad.data / torch.norm(processed_image.grad.data,float("inf"))
-
-        processed_image.data = processed_image.data - adv_noise
+        adv_noise = epsilon[i] * processed_image.grad.data.sign()   # standard FGSM sign step
+        processed_image.data = processed_image.data + adv_noise
        
         X_adv_4d = torch.clamp(processed_image, 0, 1).cpu().data.numpy()  # [batch*depth, channels, H, W]
         X_adv_4d = np.reshape(X_adv_4d, (b, d, num_features, h, w))       # restore to 5D: [batch, depth, channels, H, W]

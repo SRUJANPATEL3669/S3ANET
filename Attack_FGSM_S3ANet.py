@@ -159,10 +159,12 @@ def main(args):
 
         adv_images_5d = torch.from_numpy(X_adv).float().to(device)  # [batch, depth, channels, H, W]
         b2, d2, c2, h2, w2 = adv_images_5d.shape
-        adv_images = adv_images_5d.view(b2 * d2, c2, h2, w2)  # reshape to 4D for Conv2d
-
-        # 对抗样本用于测试
-        output = Model(adv_images)
+        adv_images_4d = adv_images_5d.view(b2 * d2, c2, h2, w2)     # [1, C, H, W] for Model + Defense
+        # ── Experiment 3: Apply S3ANet Defense Algorithm to perturbed data ──
+        print('Applying S3ANet Spatial-Spectral Defense Algorithm to perturbed data...')
+        defended_adv_images = Apply_S3ANet_Defense(adv_images_4d)    # returns (1, C, H, W) tensor
+        
+        output = Model(defended_adv_images)
         _, predict_labels = torch.max(output, 1)
 
         te2_time = time.time() - te1_time
@@ -193,14 +195,15 @@ def main(args):
         print('Kappa : %.3f %%' % (kappa_clean * 100))
         print('AA    : %.3f %%' % (AA_clean    * 100))
         print('─' * 55)
-        print('── After FGSM Attack (ε=%.4f) ───────────────────────' % args.epsilon)
+        print('─' * 55)
+        print('── Experiment 3: S3ANet Defense Algorithm on Perturbed Data (ε=%.4f) ──' % args.epsilon)
         print('OA    : %.3f %%' % (OA2    * 100))
         print('Kappa : %.3f %%' % (kappa2 * 100))
         print('AA    : %.3f %%' % (AA2    * 100))
         print('producerA:', (ProducerA2) * 100)
         print('Train_time: %.2f, Test_time: %.2f, Runtime: %.2f' % (tr2_time, te2_time, tr2_time + te2_time))
         print('─' * 55)
-        print('── Spectral Attack Metrics ──────────────────────────')
+        print('── Spectral Attack & Defense Metrics ────────────────' )
         print('SAM  (mean spectral angle, deg)  : %.4f' % sam_val)
         print('SID  (spectral info divergence)  : %.6f' % sid_val)
         print('Physical-consistency rate (θ=5°) : %.4f  (%.2f%%)' % (phys_rate, phys_rate * 100))
@@ -224,7 +227,7 @@ def main(args):
             f.write('AA    : %.3f %%\n' % (AA_clean    * 100))
             f.write('ProducerA: %s\n'   % str(ProducerA_clean * 100))
             f.write('─' * 55 + '\n')
-            f.write('── Clean Model on Perturbed Data (FGSM Attack) ───\n')
+            f.write('── Experiment 3: S3ANet Defense Algorithm on Perturbed Data (FGSM) ───\n')
             f.write('OA    : %.3f %%\n' % (OA2    * 100))
             f.write('Kappa : %.3f %%\n' % (kappa2 * 100))
             f.write('AA    : %.3f %%\n' % (AA2    * 100))
