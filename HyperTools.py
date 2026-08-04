@@ -228,15 +228,15 @@ def CalPhysConsistency(X_clean, X_adv, num_endmembers=10, theta=0.1):
 def LoadHSI(dataID=1,num_label=150):
     #ID=1:Pavia University
     if dataID==1:        
-        data = sio.loadmat('./Data/PaviaU.mat')
+        data = sio.loadmat('./Data/paviaU.mat')
         X = data['paviaU']    
-        data = sio.loadmat('./Data/PaviaU_gt.mat')
+        data = sio.loadmat('./Data/paviaU_gt.mat')
         Y = data['paviaU_gt']
             
     elif dataID==2:        
-        data = sio.loadmat('./Data/Salinas_corrected.mat')
+        data = sio.loadmat('./Data/salinas_corrected.mat')
         X = data['salinas_corrected']    
-        data = sio.loadmat('./Data/Salinas_gt.mat')
+        data = sio.loadmat('./Data/salinas_gt.mat')
         Y = data['salinas_gt']
 
     elif dataID==3:
@@ -252,9 +252,9 @@ def LoadHSI(dataID=1,num_label=150):
             Y = Y_raw.T.astype('int')              # (210, 954)
 
     elif dataID==4:
-        data = sio.loadmat('./Data/Indian_pines_corrected.mat')
+        data = sio.loadmat('./Data/indian_pines_corrected.mat')
         X = data['indian_pines_corrected']
-        data = sio.loadmat('./Data/Indian_pines_gt.mat')
+        data = sio.loadmat('./Data/indian_pines_gt.mat')
         Y = data['indian_pines_gt']
         num_label = [30, 50, 50, 50, 50, 50, 20, 50, 15, 50, 50, 50, 50, 30, 50, 50]
 
