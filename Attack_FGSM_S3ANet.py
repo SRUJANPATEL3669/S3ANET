@@ -12,6 +12,16 @@ import utils_logger
 DataName = {1: 'PaviaU', 2: 'Salinas', 3: 'Houston', 4: 'IndianP'}
 
 def run_fgsm(dataID, args):
+    # Fix all random seeds for full reproducibility
+    import random
+    random.seed(1)
+    np.random.seed(1)
+    torch.manual_seed(1)
+    torch.cuda.manual_seed(1)
+    torch.cuda.manual_seed_all(1)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
     if dataID == 1:
         num_classes = 9
         num_features = 103

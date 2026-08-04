@@ -275,7 +275,7 @@ def LoadHSI(dataID=1,num_label=150):
         
         index = np.where(Y==i)[0]
         n_data = index.shape[0]
-        np.random.seed(12345)
+        np.random.seed(1)
         randomArray_label = np.random.permutation(n_data)
         # num_label can be a list (per-class counts for Indian Pines) or a scalar
         train_num = int(num_label[i-1]) if isinstance(num_label, list) else int(num_label)
