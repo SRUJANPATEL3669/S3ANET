@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import scipy.io as sio  
+import scipy.io as sio
+import os
 
 def featureNormalize(X,type):
     #type==1 x = (x-mean)/std(x)
@@ -57,23 +58,15 @@ def DrawResult(labels,imageID):
         palette = palette*1.0/255
 
     elif imageID == 3:
-        row = 349
-        col = 1905
+        row = 210
+        col = 954
         palette = np.array([[0, 205, 0],
                             [127, 255, 0],
                             [46, 139, 87],
                             [0, 139, 0],
                             [160, 82, 45],
                             [0, 255, 255],
-                            [255, 255, 255],
-                            [216, 191, 216],
-                            [255, 0, 0],
-                            [139, 0, 0],
-                            [0, 0, 0],
-                            [255, 255, 0],
-                            [238, 154, 0],
-                            [85, 26, 139],
-                            [255, 127, 80]])
+                            [255, 255, 255]])
         palette = palette * 1.0 / 255
 
     elif imageID == 4:
@@ -138,6 +131,99 @@ def CalAccuracy(predict,label):
     Kappa = (n*np.sum(correct_sum) - np.sum(reali * predicti)) *1.0/ (n*n - np.sum(reali * predicti))
     return OA,Kappa,producerA
 
+# ============================================================
+#  Advanced Adversarial Metrics
+# ============================================================
+
+def CalSAM(X_clean, X_adv):
+    """Mean Spectral Angle Mapper (radians) between clean and adversarial pixels.
+    X_clean, X_adv: (N, C) arrays.
+    """
+    dot = np.sum(X_clean * X_adv, axis=1)
+    norm1 = np.linalg.norm(X_clean, axis=1)
+    norm2 = np.linalg.norm(X_adv, axis=1)
+    cos_theta = np.clip(dot / (norm1 * norm2 + 1e-8), -1.0, 1.0)
+    return float(np.mean(np.arccos(cos_theta)))
+
+def CalSID(X_clean, X_adv):
+    """Mean Spectral Information Divergence between clean and adversarial pixels.
+    X_clean, X_adv: (N, C) arrays.
+    """
+    X_c = X_clean - np.min(X_clean, axis=1, keepdims=True) + 1e-4
+    X_a = X_adv  - np.min(X_adv,  axis=1, keepdims=True) + 1e-4
+    P = X_c / np.sum(X_c, axis=1, keepdims=True)
+    Q = X_a / np.sum(X_a, axis=1, keepdims=True)
+    sid = np.sum(P * np.log(P / Q), axis=1) + np.sum(Q * np.log(Q / P), axis=1)
+    return float(np.mean(sid))
+
+def CalASR(clean_preds, adv_preds, Y_flat, test_array):
+    """Attack Success Rate: fraction of correctly-classified test pixels that got flipped.
+    clean_preds, adv_preds, Y_flat: 1-D arrays over ALL pixels.
+    test_array: indices of test pixels.
+    """
+    c = clean_preds[test_array]
+    a = adv_preds[test_array]
+    t = Y_flat[test_array]
+    correct_mask = (c == t)
+    if correct_mask.sum() == 0:
+        return 0.0
+    return float(np.sum(correct_mask & (a != t)) / correct_mask.sum())
+
+def _vca(Y, R):
+    """Lightweight Vertex Component Analysis (VCA) to find R endmembers.
+    Y: (C, N)  spectral matrix.
+    Returns E: (C, R) endmember matrix.
+    """
+    C, N = Y.shape
+    u, _, _ = np.linalg.svd(Y, full_matrices=False)
+    Ud = u[:, :R]                          # (C, R)
+    x_p = Ud.T @ Y                         # (R, N)
+    c   = x_p.mean(axis=1, keepdims=True)  # (R, 1)
+    y   = x_p - c                          # (R, N)
+    indice = np.zeros(R, dtype=int)
+    A = np.zeros((R, R))
+    A[-1, 0] = 1.0
+    for i in range(R):
+        w = np.random.randn(R, 1)
+        f = w - A @ (np.linalg.pinv(A) @ w)
+        f /= (np.linalg.norm(f) + 1e-8)
+        v = f.T @ y                        # (1, N)
+        indice[i] = np.argmax(np.abs(v))
+        A[:, i] = y[:, indice[i]]
+    return Y[:, indice]                    # (C, R)
+
+def CalPhysConsistency(X_clean, X_adv, num_endmembers=10, theta=0.1):
+    """Physical-consistency rate: fraction of adversarial pixels that pass an
+    unmixing round-trip (re-unmix X_adv, reconstruct, SAM to X_adv < theta).
+    X_clean, X_adv: (N, C)
+    """
+    from scipy.optimize import nnls
+    np.random.seed(0)
+    Y_c = X_clean.T                        # (C, N)
+    R   = num_endmembers
+
+    # Extract endmembers from clean subset (max 5000 pixels for speed)
+    sub_n = min(Y_c.shape[1], 5000)
+    idx   = np.random.choice(Y_c.shape[1], sub_n, replace=False)
+    E     = _vca(Y_c[:, idx], R)          # (C, R)
+
+    Y_adv = X_adv.T                        # (C, N)
+    N     = Y_adv.shape[1]
+    abundances = np.zeros((R, N))
+    delta = 1e-4
+    E_aug = np.vstack([E, np.ones((1, R)) * delta])
+    for i in range(N):
+        b_aug = np.append(Y_adv[:, i], delta)
+        abundances[:, i], _ = nnls(E_aug, b_aug)
+
+    X_recon = (E @ abundances).T           # (N, C)
+    sam_vals = np.arccos(np.clip(
+        np.sum(X_adv * X_recon, axis=1) /
+        (np.linalg.norm(X_adv, axis=1) * np.linalg.norm(X_recon, axis=1) + 1e-8),
+        -1.0, 1.0))
+    return float(np.mean(sam_vals < theta))
+
+
 def LoadHSI(dataID=1,num_label=150):
     #ID=1:Pavia University
     if dataID==1:        
@@ -153,10 +239,16 @@ def LoadHSI(dataID=1,num_label=150):
         Y = data['salinas_gt']
 
     elif dataID==3:
-        data = sio.loadmat('./Data/GRSS2013.mat')
-        X = data['GRSS2013']
-        data = sio.loadmat('./Data/GRSS2013_gt.mat')
-        Y = data['GRSS2013_gt']
+        # Houston13 is stored in MATLAB v7.3 (HDF5) format.
+        # ori_data shape is (C, col, row) -> transpose to (row, col, C)
+        import h5py
+        with h5py.File('./Data/houston2013.mat', 'r') as f:
+            X = np.array(f['ori_data']).transpose(2, 1, 0)  # (row, col, C)
+        with h5py.File('./Data/houston2013_gt.mat', 'r') as f:
+            Y = np.array(f['map']).astype('int')             # (row, col) or (col, row)
+        # h5py stores in Fortran order so col/row may be swapped — match X
+        if Y.shape != X.shape[:2]:
+            Y = Y.T
 
     elif dataID==4:
         data = sio.loadmat('./Data/Indian_pines_corrected.mat')
