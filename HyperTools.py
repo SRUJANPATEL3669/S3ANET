@@ -68,6 +68,7 @@ def DrawResult(labels,imageID):
                             [0, 255, 255],
                             [255, 255, 255]])
         palette = palette * 1.0 / 255
+        num_class = min(num_class, len(palette))
 
     elif imageID == 4:
         row = 145
@@ -240,15 +241,15 @@ def LoadHSI(dataID=1,num_label=150):
 
     elif dataID==3:
         # Houston13 is stored in MATLAB v7.3 (HDF5) format.
-        # ori_data shape is (C, col, row) -> transpose to (row, col, C)
+        # h5py reads in C order: ori_data -> (C=48, dim1=954, dim2=210)
+        # Transpose to (row=210, col=954, C=48)
         import h5py
         with h5py.File('./Data/houston2013.mat', 'r') as f:
-            X = np.array(f['ori_data']).transpose(2, 1, 0)  # (row, col, C)
+            raw = np.array(f['ori_data'])          # (48, 954, 210)
+            X = raw.transpose(2, 1, 0)             # (210, 954, 48)
         with h5py.File('./Data/houston2013_gt.mat', 'r') as f:
-            Y = np.array(f['map']).astype('int')             # (row, col) or (col, row)
-        # h5py stores in Fortran order so col/row may be swapped — match X
-        if Y.shape != X.shape[:2]:
-            Y = Y.T
+            Y_raw = np.array(f['map'])             # (954, 210) in h5py C-order
+            Y = Y_raw.T.astype('int')              # (210, 954)
 
     elif dataID==4:
         data = sio.loadmat('./Data/Indian_pines_corrected.mat')
