@@ -130,9 +130,16 @@ def run_fgsm(dataID, args):
 
     print('--------- %s ---------' % DataName[dataID])
     print('OA=%.2f%%  Kappa=%.4f  AA=%.2f%%' % (OA*100, kappa, AA*100))
+    print('Per-class Accuracy (%%):')    
+    for cls_idx, acc in enumerate(ProducerA):
+        print('  Class %2d : %.2f%%' % (cls_idx + 1, acc * 100))
     print('SAM=%.4f rad  SID=%.4f  ASR=%.2f%%  PhysCons=%.2f%%'
           % (sam, sid, asr*100, phys*100))
     print('Train_time=%.1fs  Attack_time=%.1fs' % (tr_time, te_time))
+
+    # Build per-class columns for Excel
+    per_class = {'Class_%d_pct' % (i+1): round(float(v)*100, 3)
+                 for i, v in enumerate(ProducerA)}
 
     return dict(Dataset=DataName[dataID],
                 OA_pct=round(OA*100, 3), Kappa=round(kappa, 4),
@@ -141,7 +148,8 @@ def run_fgsm(dataID, args):
                 ASR_pct=round(asr*100, 3),
                 PhysConsistency_pct=round(phys*100, 3),
                 Train_time_s=round(tr_time, 1),
-                Attack_time_s=round(te_time, 1))
+                Attack_time_s=round(te_time, 1),
+                **per_class)
 
 
 def main(args):
