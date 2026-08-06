@@ -12,7 +12,7 @@ import utils_logger
 import matplotlib.pyplot as plt
 
 # Import our new mask generator and masked attacks
-from Attack_Masked_L2 import SaliencyMaskGenerator, Masked_L2_PGD, Masked_L2_FGSM, Masked_L2_IFGSM
+from Attack_Masked_Linf import SaliencyMaskGenerator, Masked_Linf_PGD, Masked_Linf_FGSM, Masked_Linf_IFGSM
 
 DataName = {1: 'PaviaU', 2: 'Salinas', 3: 'Houston', 4: 'IndianP'}
 
@@ -96,12 +96,14 @@ def run_masked_attack(dataID, args):
     print(f"Executing {args.attack_type} attack...")
     te1 = time.time()
     
+    alpha = args.alpha if args.alpha else 2.5 * args.epsilon / args.iters
+
     if args.attack_type == 'PGD':
-        adv_image = Masked_L2_PGD(Model, images, label_tar, mask, args.epsilon, args.iters, args.alpha, criterion, min_val=0.0, max_val=1.0)
+        adv_image = Masked_Linf_PGD(Model, images, label_tar, mask, args.epsilon, alpha, args.iters, criterion, min_val=0.0, max_val=1.0)
     elif args.attack_type == 'IFGSM':
-        adv_image = Masked_L2_IFGSM(Model, images, label_tar, mask, args.epsilon, args.iters, args.alpha, criterion, min_val=0.0, max_val=1.0)
+        adv_image = Masked_Linf_IFGSM(Model, images, label_tar, mask, args.epsilon, alpha, args.iters, criterion, min_val=0.0, max_val=1.0)
     elif args.attack_type == 'FGSM':
-        adv_image = Masked_L2_FGSM(Model, images, label_tar, mask, args.epsilon, criterion, min_val=0.0, max_val=1.0)
+        adv_image = Masked_Linf_FGSM(Model, images, label_tar, mask, args.epsilon, criterion, min_val=0.0, max_val=1.0)
     else:
         raise ValueError(f"Unknown attack type: {args.attack_type}")
         
