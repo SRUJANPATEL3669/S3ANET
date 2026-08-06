@@ -204,8 +204,8 @@ if __name__ == '__main__':
     parser.add_argument('--decay',   type=float, default=5e-5)
     parser.add_argument('--epsilon', type=float, default=0.04)
     parser.add_argument('--iters',   type=int,   default=10)
-    parser.add_argument('--restarts',type=int,   default=5)
-    parser.add_argument('--alpha',   type=float, default=0.0125) # 0 means 2.5 * epsilon/iters
+    parser.add_argument('--restarts',type=int,   default=1)
+    parser.add_argument('--alpha',   type=float, default=0.01) # 0 means 2.5 * epsilon/iters
     parser.add_argument('--epoch',   type=int,   default=1000)
     parser.add_argument('--bins', nargs='+', type=int, default=[1,2,3,6])
 
