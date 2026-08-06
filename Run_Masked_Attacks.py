@@ -99,11 +99,11 @@ def run_masked_attack(dataID, args):
     alpha = args.alpha if args.alpha else 2.5 * args.epsilon / args.iters
 
     if args.attack_type == 'PGD':
-        adv_image = Masked_Linf_PGD(Model, images, label_tar, mask, args.epsilon, alpha, args.iters, criterion, min_val=0.0, max_val=1.0)
+        adv_image = Masked_Linf_PGD(Model, images, label_tar, mask, args.epsilon, alpha, args.iters, criterion, min_val=0.0, max_val=1.0, targeted=True)
     elif args.attack_type == 'IFGSM':
-        adv_image = Masked_Linf_IFGSM(Model, images, label_tar, mask, args.epsilon, alpha, args.iters, criterion, min_val=0.0, max_val=1.0)
+        adv_image = Masked_Linf_IFGSM(Model, images, label_tar, mask, args.epsilon, alpha, args.iters, criterion, min_val=0.0, max_val=1.0, targeted=True)
     elif args.attack_type == 'FGSM':
-        adv_image = Masked_Linf_FGSM(Model, images, label_tar, mask, args.epsilon, criterion, min_val=0.0, max_val=1.0)
+        adv_image = Masked_Linf_FGSM(Model, images, label_tar, mask, args.epsilon, criterion, min_val=0.0, max_val=1.0, targeted=True)
     else:
         raise ValueError(f"Unknown attack type: {args.attack_type}")
         

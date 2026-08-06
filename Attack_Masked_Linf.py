@@ -43,7 +43,7 @@ class SaliencyMaskGenerator:
         
         return mask
 
-def Masked_Linf_FGSM(model, images, labels, mask, epsilon, criterion=None, min_val=0.0, max_val=1.0):
+def Masked_Linf_FGSM(model, images, labels, mask, epsilon, criterion=None, min_val=0.0, max_val=1.0, targeted=False):
     """
     Masked Fast Gradient Sign Method (L-infinity constrained).
     Noise is generated only on the bands selected by the binary mask and clamped by epsilon.
@@ -65,12 +65,15 @@ def Masked_Linf_FGSM(model, images, labels, mask, epsilon, criterion=None, min_v
     delta = epsilon * g.sign()
     
     # Apply noise and clamp to image bounds
-    images_adv = torch.clamp(images + delta, min_val, max_val).detach()
+    if targeted:
+        images_adv = torch.clamp(images - delta, min_val, max_val).detach()
+    else:
+        images_adv = torch.clamp(images + delta, min_val, max_val).detach()
     
     return images_adv
 
 
-def Masked_Linf_IFGSM(model, images, labels, mask, epsilon, alpha, iters, criterion=None, min_val=0.0, max_val=1.0):
+def Masked_Linf_IFGSM(model, images, labels, mask, epsilon, alpha, iters, criterion=None, min_val=0.0, max_val=1.0, targeted=False):
     """
     Masked Iterative Fast Gradient Sign Method (L-infinity constrained).
     """
@@ -91,7 +94,10 @@ def Masked_Linf_IFGSM(model, images, labels, mask, epsilon, alpha, iters, criter
         g = mask * g_raw
         
         # Apply step
-        images_adv = images_adv.detach() + alpha * g.sign()
+        if targeted:
+            images_adv = images_adv.detach() - alpha * g.sign()
+        else:
+            images_adv = images_adv.detach() + alpha * g.sign()
         
         # L-infinity Projection
         eta = torch.clamp(images_adv - images, min=-epsilon, max=epsilon)
@@ -100,7 +106,7 @@ def Masked_Linf_IFGSM(model, images, labels, mask, epsilon, alpha, iters, criter
     return images_adv
 
 
-def Masked_Linf_PGD(model, images, labels, mask, epsilon, alpha, iters, criterion=None, min_val=0.0, max_val=1.0):
+def Masked_Linf_PGD(model, images, labels, mask, epsilon, alpha, iters, criterion=None, min_val=0.0, max_val=1.0, targeted=False):
     """
     Masked Projected Gradient Descent (L-infinity constrained).
     Includes random initialization strictly on the masked bands.
@@ -127,7 +133,10 @@ def Masked_Linf_PGD(model, images, labels, mask, epsilon, alpha, iters, criterio
         g = mask * g_raw
         
         # Apply step
-        images_adv = images_adv.detach() + alpha * g.sign()
+        if targeted:
+            images_adv = images_adv.detach() - alpha * g.sign()
+        else:
+            images_adv = images_adv.detach() + alpha * g.sign()
         
         # L-infinity Projection
         eta = torch.clamp(images_adv - images, min=-epsilon, max=epsilon)
