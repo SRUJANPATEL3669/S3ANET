@@ -3,6 +3,7 @@ classifier input patches (post-PCA), for comparison against RTAA."""
 
 from __future__ import annotations
 
+import numpy as np
 import torch
 from torch import Tensor, nn
 
@@ -151,7 +152,6 @@ def ssfgsm_attack_full_scene(
     """SS-FGSM for whole-scene models (SACNet/S3ANet), including both spatial and spectral smoothing."""
     try:
         from skimage.segmentation import slic
-        import numpy as np
     except ImportError:
         raise ImportError("skimage is required for full-scene SS-FGSM. pip install scikit-image")
 

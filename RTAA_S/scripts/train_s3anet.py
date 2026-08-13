@@ -6,11 +6,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 from rtaa.models.s3anet import S3ANET_REPO_DIR
 sys.path.insert(0, S3ANET_REPO_DIR)
-try:
-    from HyperTools import CalAccuracy
-    from Model_S3ANet import CrossEntropy2d, S3ANet, adjust_learning_rate
-except ImportError:
-    pass
+from HyperTools import CalAccuracy  # type: ignore
+from Model_S3ANet import CrossEntropy2d, S3ANet, adjust_learning_rate  # type: ignore
 
 def train(dataset, n_classes, n_bands, bins=(1, 2, 3, 6), n_epochs=1000, lr=5e-4, weight_decay=5e-5, device="cuda:0"):
     data_dir = f"{S3ANET_REPO_DIR}/Data/{dataset}/"

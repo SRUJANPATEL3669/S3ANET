@@ -22,8 +22,8 @@ import torch
 from rtaa.models.sacnet import SACNET_REPO_DIR
 
 sys.path.insert(0, SACNET_REPO_DIR)
-from HyperTools import CalAccuracy
-from Models import CrossEntropy2d, SACNet, adjust_learning_rate
+from HyperTools import CalAccuracy  # type: ignore
+from Models import CrossEntropy2d, SACNet, adjust_learning_rate  # type: ignore
 
 
 def train(

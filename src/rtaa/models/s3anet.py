@@ -41,6 +41,6 @@ def load_s3anet(
         )
     if S3ANET_REPO_DIR not in sys.path:
         sys.path.insert(0, S3ANET_REPO_DIR)
-    from Model_S3ANet import S3ANet
+    from Model_S3ANet import S3ANet  # type: ignore
 
     return S3ANet(num_features=n_bands, num_classes=n_classes, bins=list(bins)).to(device)

@@ -6,11 +6,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 from rtaa.models.sacnet import SACNET_REPO_DIR
 sys.path.insert(0, SACNET_REPO_DIR)
-try:
-    from HyperTools import CalAccuracy
-    from Models import CrossEntropy2d, SACNet, adjust_learning_rate
-except ImportError:
-    pass
+from HyperTools import CalAccuracy  # type: ignore
+from Models import CrossEntropy2d, SACNet, adjust_learning_rate  # type: ignore
 
 def train(dataset, n_classes, n_bands, n_epochs=1000, lr=5e-4, weight_decay=5e-5, device="cuda:0"):
     data_dir = f"{SACNET_REPO_DIR}/Data/{dataset}/"

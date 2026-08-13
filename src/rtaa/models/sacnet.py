@@ -30,6 +30,6 @@ def load_sacnet(n_bands: int = 103, n_classes: int = 9, device: str | torch.devi
         )
     if SACNET_REPO_DIR not in sys.path:
         sys.path.insert(0, SACNET_REPO_DIR)
-    from Models import SACNet
+    from Models import SACNet  # type: ignore
 
     return SACNet(num_features=n_bands, num_classes=n_classes).to(device)

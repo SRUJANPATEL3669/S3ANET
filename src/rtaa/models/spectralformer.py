@@ -64,7 +64,7 @@ def load_spectralformer_vit(
         )
     if SPECTRALFORMER_REPO_DIR not in sys.path:
         sys.path.insert(0, SPECTRALFORMER_REPO_DIR)
-    from vit_pytorch import ViT
+    from vit_pytorch import ViT  # type: ignore
 
     if variant not in _VARIANT_CONFIGS:
         raise ValueError(f"Unknown variant {variant!r}, expected one of {list(_VARIANT_CONFIGS)}")

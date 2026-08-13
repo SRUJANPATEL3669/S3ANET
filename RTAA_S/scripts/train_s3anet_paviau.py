@@ -22,8 +22,8 @@ import torch
 S3ANET_REPO_DIR = "/home/jayant/projects/S3ANet"
 
 sys.path.insert(0, S3ANET_REPO_DIR)
-from HyperTools import CalAccuracy
-from Model_S3ANet import CrossEntropy2d, S3ANet, adjust_learning_rate
+from HyperTools import CalAccuracy  # type: ignore
+from Model_S3ANet import CrossEntropy2d, S3ANet, adjust_learning_rate  # type: ignore
 
 
 def train(
