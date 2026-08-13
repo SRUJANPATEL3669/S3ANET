@@ -1,0 +1,18 @@
+"""Reruns the SpectralFormer pixel-wise ASR sweep (run_asr_sweep_replicated.py)
+against the real-libRadtran-trained RTM surrogate instead of the
+placeholder-physics one. See run_asr_sweep_hybridsn_real_rtm.py for
+rationale.
+"""
+
+from __future__ import annotations
+
+import run_asr_sweep_replicated as base
+from _real_rtm_helper import run_protected
+
+if __name__ == "__main__":
+    run_protected(
+        base,
+        checkpoint_override="checkpoints/rtm_surrogate_200bands_real.pt",
+        base_out_path="asr_sweep_replicated_results.json",
+        real_out_path="asr_sweep_replicated_real_rtm_results.json",
+    )

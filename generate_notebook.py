@@ -1,0 +1,164 @@
+import json
+import os
+from pathlib import Path
+
+notebook_content = {
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": []
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "# Adversarial Attack Benchmark Pipeline\n",
+        "This notebook runs the full pipeline for evaluating HSI models (HybridSN, S3ANet, SACNet, SpectralFormer) against adversarial attacks (FGSM, I-FGSM, PGD, SS-FGSM, RTAA)."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": None,
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "from google.colab import drive\n",
+        "drive.mount('/content/drive')\n",
+        "\n",
+        "DATA_DIR = '/content/drive/MyDrive/S3Anet_data'\n",
+        "REPO_DIR = '/content/RTAA'"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## 1. Setup Environment and Repositories"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": None,
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "!git clone https://github.com/YichuXu/S3ANet.git /content/S3ANet\n",
+        "!git clone https://github.com/YonghaoXu/SACNet.git /content/SACNet\n",
+        "!git clone https://github.com/danfenghong/IEEE_TGRS_SpectralFormer.git /content/SpectralFormer\n",
+        "\n",
+        "!mkdir -p /content/S3ANet/Data/PaviaU /content/S3ANet/Data/IndianPines /content/S3ANet/Data/Salinas\n",
+        "!mkdir -p /content/SACNet/Data/PaviaU /content/SACNet/Data/IndianPines /content/SACNet/Data/Salinas\n",
+        "\n",
+        "# Link data into S3ANet and SACNet Data folders (Assuming S3Anet_data has the .mat files)\n",
+        "!ln -s /content/drive/MyDrive/S3Anet_data/* /content/S3ANet/Data/PaviaU/\n",
+        "!ln -s /content/drive/MyDrive/S3Anet_data/* /content/SACNet/Data/PaviaU/\n",
+        "!ln -s /content/drive/MyDrive/S3Anet_data/* /content/S3ANet/Data/IndianPines/\n",
+        "!ln -s /content/drive/MyDrive/S3Anet_data/* /content/SACNet/Data/IndianPines/\n",
+        "!ln -s /content/drive/MyDrive/S3Anet_data/* /content/S3ANet/Data/Salinas/\n",
+        "!ln -s /content/drive/MyDrive/S3Anet_data/* /content/SACNet/Data/Salinas/\n",
+        "\n",
+        "!pip install scikit-image openpyxl"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## 2. Generate Dataset Splits (S3ANet & SACNet)"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": None,
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "# Note: GenSample.py arguments might need adjustment based on the original repositories.\n",
+        "!cd /content/S3ANet && python GenSample.py --dataID 1 --train_samples 300\n",
+        "!cd /content/SACNet && python GenSample.py --dataID 1 --train_samples 300"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## 3. Train Classifiers"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": None,
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "import os\n",
+        "os.environ['PYTHONPATH'] = f\"/content/RTAA/src:{os.environ.get('PYTHONPATH', '')}\"\n",
+        "\n",
+        "# Train HybridSN\n",
+        "!python /content/RTAA/RTAA_S/scripts/train_classifier.py --dataset PaviaU\n",
+        "!python /content/RTAA/RTAA_S/scripts/train_classifier.py --dataset IndianPines\n",
+        "!python /content/RTAA/RTAA_S/scripts/train_classifier.py --dataset Salinas\n",
+        "\n",
+        "# Train S3ANet\n",
+        "!python /content/RTAA/RTAA_S/scripts/train_s3anet.py --dataset PaviaU --classes 9 --bands 103\n",
+        "!python /content/RTAA/RTAA_S/scripts/train_s3anet.py --dataset IndianPines --classes 16 --bands 200\n",
+        "!python /content/RTAA/RTAA_S/scripts/train_s3anet.py --dataset Salinas --classes 16 --bands 204\n",
+        "\n",
+        "# Train SACNet\n",
+        "!python /content/RTAA/RTAA_S/scripts/train_sacnet.py --dataset PaviaU --classes 9 --bands 103\n",
+        "!python /content/RTAA/RTAA_S/scripts/train_sacnet.py --dataset IndianPines --classes 16 --bands 200\n",
+        "!python /content/RTAA/RTAA_S/scripts/train_sacnet.py --dataset Salinas --classes 16 --bands 204\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## 4. Train RTM Surrogates"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": None,
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "# Generates surrogates for 103, 200, 204 bands for the 3 datasets\n",
+        "!python /content/RTAA/src/rtaa/rtm/train_surrogate.py --n-bands 103 --out checkpoints/rtm_surrogate_103bands.pt\n",
+        "!python /content/RTAA/src/rtaa/rtm/train_surrogate.py --n-bands 200 --out checkpoints/rtm_surrogate_200bands.pt\n",
+        "!python /content/RTAA/src/rtaa/rtm/train_surrogate.py --n-bands 204 --out checkpoints/rtm_surrogate_204bands.pt\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## 5. Run Benchmark and Generate Excel"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": None,
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "!python /content/RTAA/RTAA_S/scripts/run_full_benchmark.py --data-dir {DATA_DIR} --out /content/drive/MyDrive/benchmark_results.xlsx\n",
+        "print(\"Benchmark completed! Excel file saved to Google Drive.\")"
+      ]
+    }
+  ]
+}
+
+os.makedirs('notebooks', exist_ok=True)
+with open('notebooks/adversarial_benchmark_colab.ipynb', 'w') as f:
+    json.dump(notebook_content, f, indent=2)
