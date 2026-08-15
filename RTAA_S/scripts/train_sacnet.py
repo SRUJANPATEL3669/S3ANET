@@ -14,7 +14,7 @@ import torch
 
 # Add src to path so rtaa package is importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
-from rtaa.models.sacnet import SACNET_REPO_DIR  # noqa: E402
+from src.rtaa.models.sacnet import SACNET_REPO_DIR  # noqa: E402
 
 
 def train(

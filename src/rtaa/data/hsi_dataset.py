@@ -18,6 +18,7 @@ actual arrays, not by filename alone:
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -28,7 +29,7 @@ from scipy.io import loadmat
 from sklearn.decomposition import PCA
 from torch.utils.data import Dataset
 
-DEFAULT_DATA_DIR = "/home/jayant/projects/SAFER/data"
+DEFAULT_DATA_DIR = os.environ.get("RTAA_DATA_DIR", "/content/drive/MyDrive/S3Anet_data")
 
 
 @dataclass(frozen=True)

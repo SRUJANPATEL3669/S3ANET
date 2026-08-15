@@ -3,10 +3,8 @@ This script is designed to be run from the Colab notebook.
 """
 
 import argparse
-import json
-import time
-import os
-import torch
+
+
 import numpy as np
 from pathlib import Path
 
@@ -14,16 +12,7 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 
-from rtaa.data.hsi_dataset import load_hsi_cube, normalize_reflectance
-from rtaa.eval.metrics import (
-    overall_accuracy, average_accuracy, cohen_kappa, per_class_accuracy,
-    spectral_angle_mapper, spectral_information_divergence, 
-    physical_consistency_rate, attack_success_rate
-)
 from rtaa.eval.excel_writer import write_benchmark_results
-from rtaa.attacks.baselines import fgsm_attack, pgd_attack, ifgsm_attack, ssfgsm_attack_full_scene
-from rtaa.rtm.surrogate import RTMSurrogate
-from rtaa.rtm.mismatch import AtmosphericMismatchConfig
 
 DATASETS = {
     "PaviaU": {"bands": 103, "classes": 9},
@@ -40,7 +29,7 @@ def main():
     parser.add_argument("--out", type=str, default="benchmark_results.xlsx")
     args = parser.parse_args()
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
     
     results = []
     

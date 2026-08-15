@@ -19,7 +19,7 @@ import time
 import numpy as np
 import torch
 
-from rtaa.models.sacnet import SACNET_REPO_DIR
+from src.rtaa.models.sacnet import SACNET_REPO_DIR
 
 sys.path.insert(0, SACNET_REPO_DIR)
 from HyperTools import CalAccuracy  # type: ignore

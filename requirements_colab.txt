@@ -5,3 +5,4 @@ scikit-image
 openpyxl
 scikit-learn
 h5py
+matplotlib

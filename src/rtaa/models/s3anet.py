@@ -18,12 +18,13 @@ scripts/train_s3anet_paviau.py).
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
 import torch
 
-S3ANET_REPO_DIR = "/home/jayant/projects/S3ANet"
+S3ANET_REPO_DIR = os.environ.get("S3ANET_REPO_DIR", "/content/S3ANet")
 
 
 def load_s3anet(

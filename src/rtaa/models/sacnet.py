@@ -12,12 +12,13 @@ scripts/train_sacnet_paviau.py) rather than loading someone else's weights.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
 import torch
 
-SACNET_REPO_DIR = "/home/jayant/projects/SACNet"
+SACNET_REPO_DIR = os.environ.get("SACNET_REPO_DIR", "/content/SACNet")
 
 
 def load_sacnet(n_bands: int = 103, n_classes: int = 9, device: str | torch.device = "cpu") -> torch.nn.Module:

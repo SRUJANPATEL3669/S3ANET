@@ -11,12 +11,13 @@ imports and configures it; no model code is duplicated here.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
 import torch
 
-SPECTRALFORMER_REPO_DIR = "/home/jayant/projects/SpectralFormer"
+SPECTRALFORMER_REPO_DIR = os.environ.get("SPECTRALFORMER_REPO_DIR", "/content/SpectralFormer")
 
 # Hyperparameters and checkpoint mapping straight from the repo's README
 # ("How to use it?" section) — must match exactly for state_dict to load.
