@@ -39,7 +39,7 @@ cells.append(_code([
     "from google.colab import drive\n",
     "drive.mount('/content/drive')\n",
     "\n",
-    "DATA_DIR = '/content/drive/MyDrive/S3Anet_data'\n",
+    "DATA_DIR = '/content/drive/MyDrive/S3ANet_data'\n",
     "CHECKPOINT_DIR = '/content/drive/MyDrive/RTAA_checkpoints'\n",
     "OUTPUT_DIR = '/content/drive/MyDrive/RTAA_results'\n",
     "\n",

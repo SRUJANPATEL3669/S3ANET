@@ -12,7 +12,7 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 
-from rtaa.eval.excel_writer import write_benchmark_results
+from src.rtaa.eval.excel_writer import write_benchmark_results
 
 DATASETS = {
     "PaviaU": {"bands": 103, "classes": 9},

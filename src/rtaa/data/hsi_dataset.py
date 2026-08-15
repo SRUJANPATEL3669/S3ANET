@@ -29,7 +29,7 @@ from scipy.io import loadmat
 from sklearn.decomposition import PCA
 from torch.utils.data import Dataset
 
-DEFAULT_DATA_DIR = os.environ.get("RTAA_DATA_DIR", "/content/drive/MyDrive/S3Anet_data")
+DEFAULT_DATA_DIR = os.environ.get("RTAA_DATA_DIR", "/content/drive/MyDrive/S3ANet_data")
 
 
 @dataclass(frozen=True)
