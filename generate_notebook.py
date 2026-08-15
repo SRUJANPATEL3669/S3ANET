@@ -54,6 +54,9 @@ cells.append(_code([
 # ── Cell: Setup ──
 cells.append(_md(["## 1. Environment Setup"]))
 cells.append(_code([
+    "# Clone RTAA repo from GitHub\n",
+    "!git clone -b RTAA https://github.com/SRUJANPATEL3669/S3ANET.git /content/RTAA 2>/dev/null || echo 'RTAA already cloned'\n",
+    "\n",
     "# Clone external model repositories\n",
     "!git clone https://github.com/YichuXu/S3ANet.git /content/S3ANet 2>/dev/null || echo 'S3ANet already cloned'\n",
     "!git clone https://github.com/YonghaoXu/SACNet.git /content/SACNet 2>/dev/null || echo 'SACNet already cloned'\n",
@@ -68,14 +71,10 @@ cells.append(_code([
     "# Install dependencies\n",
     "!pip install -q scikit-image openpyxl h5py matplotlib\n",
     "\n",
-    "# Clone and install RTAA package\n",
-    "# If running from uploaded repo, adjust this path\n",
+    "# Add RTAA src to Python path so 'rtaa' package is importable\n",
     "import sys\n",
     "sys.path.insert(0, '/content/RTAA/src')\n",
     "\n",
-    "# If RTAA is not yet in /content, upload or clone it:\n",
-    "# !git clone <your-rtaa-repo-url> /content/RTAA\n",
-    "# For now, assume the src directory is accessible\n",
     "print('Environment setup complete.')\n",
 ]))
 
