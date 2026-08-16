@@ -52,7 +52,7 @@ DATASET_SPECS: dict[str, DatasetSpec] = {
         "houston18_gt.mat", "ori_data", "houston18.mat", "map", "h5py", "chw",
     ),
     "Salinas": DatasetSpec(
-        "Salinas_corrected.mat", "salinas_corrected", "Salinas_gt.mat", "salinas_gt", "scipy", "hwc",
+        "salinas_corrected.mat", "salinas_corrected", "salinas_gt.mat", "salinas_gt", "scipy", "hwc",
     ),
 }
 
