@@ -15,6 +15,45 @@ from __future__ import annotations
 
 import numpy as np
 
+# Sensor wavelength presets (matching generate_libradtran_rtm_data.py)
+SENSOR_WAVELENGTH_PRESETS = {
+    103: ("PaviaU", 430.0, 860.0),      # ROSIS sensor
+    204: ("Salinas", 400.0, 2500.0),     # AVIRIS full
+}
+
+_INDIAN_PINES_USABLE_WINDOWS_NM = [(400.0, 1350.0), (1465.0, 1790.0), (1960.0, 2500.0)]
+
+def _indian_pines_wavelength_grid() -> np.ndarray:
+    """200 bands across AVIRIS usable windows, skipping water-vapor absorption."""
+    window_widths = [hi - lo for lo, hi in _INDIAN_PINES_USABLE_WINDOWS_NM]
+    total_width = sum(window_widths)
+    bands_per_window = [round(200 * w / total_width) for w in window_widths]
+    bands_per_window[-1] += 200 - sum(bands_per_window)  # fix rounding drift
+    grids = [
+        np.linspace(lo, hi, n, endpoint=False)
+        for (lo, hi), n in zip(_INDIAN_PINES_USABLE_WINDOWS_NM, bands_per_window)
+    ]
+    return np.concatenate(grids).astype(np.float32)
+
+def sensor_wavelengths(n_bands: int) -> np.ndarray:
+    """Returns the appropriate wavelength grid for a given band count."""
+    if n_bands == 200:
+        return _indian_pines_wavelength_grid()
+    if n_bands in SENSOR_WAVELENGTH_PRESETS:
+        _, lo, hi = SENSOR_WAVELENGTH_PRESETS[n_bands]
+        return np.linspace(lo, hi, n_bands).astype(np.float32)
+    return np.linspace(400, 2500, n_bands).astype(np.float32)
+
+def generate_synthetic_rtm_pairs(
+    n_samples: int = 5000,
+    n_bands: int = 103,
+    seed: int = 0,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Notebook-friendly wrapper: picks sensor-appropriate wavelengths,
+    then delegates to generate_placeholder_dataset."""
+    wavelengths_nm = sensor_wavelengths(n_bands)
+    return generate_placeholder_dataset(wavelengths_nm, n_samples=n_samples, seed=seed)
+
 
 def generate_placeholder_dataset(
     wavelengths_nm: np.ndarray,

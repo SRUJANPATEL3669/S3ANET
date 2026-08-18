@@ -45,7 +45,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import numpy as np
 
-from rtaa.rtm.simulation_io import RTMSimulationData
+from src.rtaa.rtm.simulation_io import RTMSimulationData
 
 SENSOR_PRESETS = {
     # name: (n_bands, wl_lo_nm, wl_hi_nm)
