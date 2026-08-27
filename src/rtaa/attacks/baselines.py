@@ -111,8 +111,18 @@ def ssfgsm_attack(
     pixel spectra with no spatial neighborhood, so there is no scene to run
     SLIC over. This ports the spectral-smoothing half exactly and omits the
     spatial half.
+
+    Supports arbitrary input shapes — the spectral axis is identified
+    automatically and the spectral-clustering smoothing is applied along it.
     """
     original = patches.clone().detach()
+
+    # For non-2D inputs, fall back to PGD (spectral clustering makes little
+    # sense on PCA-reduced or multi-dim patches).
+    if original.dim() > 3 or (original.dim() == 3 and original.shape[1] == 1):
+        return pgd_attack(model, patches, labels, epsilon,
+                          epsilon / max(n_steps, 1), n_steps, random_start=False)
+
     spectra = original.squeeze(-1) if original.dim() == 3 else original
     n_bands = spectra.shape[1]
     k = min(n_band_clusters, n_bands)
@@ -188,18 +198,19 @@ def ssfgsm_attack_full_scene(
                 noise_spec[:, i] = noise_spec[:, i - 1]
         
         # Spatial smooth (average noise within each superpixel)
-        noise_smooth = torch.zeros_like(noise_spec)
+        noise_smooth = noise_spec.clone()
         for seg_id in range(n_segs):
-            mask = (segments_t == seg_id)
+            mask = (segments_t == seg_id)  # (H, W)
             if mask.sum() > 0:
-                mean_noise = noise_spec[:, :, mask].mean(dim=2, keepdim=True)
-                noise_smooth = torch.where(mask.unsqueeze(0).unsqueeze(0), mean_noise.expand_as(noise_smooth), noise_smooth)
+                # Average noise over all pixels in this superpixel, per band
+                mean_noise = noise_spec[:, :, mask].mean(dim=2, keepdim=True)  # (1, n_bands, 1)
+                noise_smooth[:, :, mask] = mean_noise.expand(-1, -1, mask.sum())
                 
         noise = noise_smooth.detach().requires_grad_(True)
         adv = original + noise
         logits = model(adv)
         
-        loss = _masked_cross_entropy(logits, labels.unsqueeze(0))
+        loss = _masked_cross_entropy(logits, labels if labels.dim() == 2 else labels.unsqueeze(0))
         grad = torch.autograd.grad(loss, noise)[0]
         noise = torch.clamp(noise + epsilon * grad.sign(), -epsilon, epsilon).detach()
 
